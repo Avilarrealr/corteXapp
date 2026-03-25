@@ -11,7 +11,7 @@ export const Navbar = () => {
     ]
 
     return (
-        <nav className="p-3 px-5 shadow bg-white relative">
+        <nav className="p-3 px-6 lg:px-30 shadow bg-white relative">
             <div className="flex items-center justify-between">
                 {/* Logo */}
                 <div className="flex items-center gap-2">
@@ -30,14 +30,14 @@ export const Navbar = () => {
                 {/* Navegación Desktop */}
                 <ul className="hidden md:flex items-center gap-8 text-slate-700 font-medium m-0">
                     {navLinks.map((link, index) => (
-                        <li key={index} className="hover:text-blue-600 cursor-pointer transition-colors">{link}</li>
+                        <li key={index} className="hover:text-green-300 cursor-pointer transition-colors">{link}</li>
                     ))}
                 </ul>
 
                 {/* Botones de Auth (Desktop) */}
                 <div className="hidden md:flex items-center gap-4">
                     {authButtons.map((btn, index) => (
-                        <button key={index} className={`px-4 py-2 rounded-pill font-medium transition-all ${btn.primary ? "bg-gray-800 hover:bg-gray-950 text-white" : "border hover:scale-105"}`}>
+                        <button key={index} className={`px-8 py-2 rounded-full font-medium transition-all ${btn.primary ? "bg-green-800 hover:bg-green-950 text-white" : "text-green-900 border hover:text-green-400 hover:border-green-400"}`}>
                             {btn.name}
                         </button>
                     ))}
@@ -53,7 +53,7 @@ export const Navbar = () => {
                         ))}
                         <div className="flex flex-col gap-2 pt-2">
                             {authButtons.map((btn, index) => (
-                                <button key={index} className={`w-full py-2 rounded-pill ${btn.primary ? "bg-gray-800 text-white" : "border"}`}>
+                                <button key={index} className={`w-full py-2 rounded-full ${btn.primary ? "bg-green-900 text-white" : "border"}`}>
                                     {btn.name}
                                 </button>
                             ))}
