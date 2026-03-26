@@ -1,6 +1,7 @@
 import React from "react";
 import { Navbar } from "../components/Navbar";
 import { Calculator, ArrowUpRight } from 'lucide-react';
+import { FeaturesSection } from "../components/FeaturesSection";
 
 export const Home = () => {
 	return (
@@ -100,32 +101,23 @@ export const Home = () => {
 
 					</div>
 				</section>
-				<section className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-20">
-					{/* Tarjeta de Ejemplo */}
-					<div className="p-6 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:scale-105 transition-all">
-						<div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-							<Calculator className="text-blue-600" />
-						</div>
-						<h3 className="text-xl font-bold mb-2">Monitoreo Real</h3>
-						<p className="text-slate-600">Sigue la ubicación de tu flota en tiempo real con precisión satelital.</p>
-					</div>
-
-					{/* Agrega más tarjetas aquí... */}
-				</section>
-				<section className="grid grid-cols-1 lg:grid-cols-2 items-center gap-16 py-20">
+				<FeaturesSection />
+				<section className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 items-center gap-16 py-20">
 					<div>
-						<span className="text-blue-600 font-semibold uppercase tracking-wider text-sm">Escalabilidad</span>
+						<span className="text-green-600 font-semibold uppercase tracking-wider text-sm">Escalabilidad</span>
 						<h2 className="text-4xl font-black mt-4 mb-6 leading-tight">
 							Experiencia que crece con tu operación logística.
 						</h2>
 						<p className="text-lg text-slate-600">
-							CortexApp se adapta desde pequeñas flotas locales hasta operaciones internacionales complejas.
+							CortexApp se adapta desde pequeñas empresas locales hasta operaciones internacionales complejas.
 						</p>
 					</div>
 
-					<div className="bg-slate-50 rounded-3xl p-8 aspect-square flex items-center justify-center border border-dashed border-slate-300">
+					<div className="hidden lg:block bg-slate-50 rounded-3xl p-8 aspect-square border border-dashed border-slate-300">
 						{/* Aquí podrías colocar una imagen o un componente de gráfico */}
-						<span className="text-slate-400">Espacio para Visualización de Datos</span>
+						<div className="flex justify-center items-center">
+							<span className="text-slate-400">Espacio para Visualización de Datos</span>
+						</div>
 					</div>
 				</section>
 			</main>

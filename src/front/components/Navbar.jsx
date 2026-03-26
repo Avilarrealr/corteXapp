@@ -1,14 +1,16 @@
 import React, { useState } from "react";
 import { Wallet2, Menu, X } from 'lucide-react';
+import { useNavigate } from "react-router-dom";
 
 export const Navbar = () => {
 
     const [isOpen, setIsOpen] = useState(false)
     const navLinks = ["Products", "Customers", "Pricing", "Learn"];
     const authButtons = [
-        { name: "Log in", primary: false },
-        { name: "Sign up", primary: true }
+        { name: "Log in", primary: false, path: "/login" },
+        { name: "Sign up", primary: true, path: "/signup" }
     ]
+    const navigate = useNavigate()
 
     return (
         <nav className="p-3 px-6 lg:px-30 shadow bg-white relative">
@@ -37,7 +39,7 @@ export const Navbar = () => {
                 {/* Botones de Auth (Desktop) */}
                 <div className="hidden md:flex items-center gap-4">
                     {authButtons.map((btn, index) => (
-                        <button key={index} className={`px-8 py-2 rounded-full font-medium transition-all ${btn.primary ? "bg-green-800 hover:bg-green-950 text-white" : "text-green-900 border hover:text-green-400 hover:border-green-400"}`}>
+                        <button key={index} onClick={() => navigate(btn.path)} className={`px-8 py-2 rounded-full font-medium transition-all ${btn.primary ? "bg-green-800 hover:bg-green-950 text-white" : "text-green-900 border hover:text-green-400 hover:border-green-400"}`}>
                             {btn.name}
                         </button>
                     ))}
