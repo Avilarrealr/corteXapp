@@ -1,10 +1,61 @@
-import React from "react";
-import { ArrowUpRight, UserPlus } from 'lucide-react';
+import React, { useState } from "react";
+import useGlobalReducer from "../hooks/useGlobalReducer";
+import { ArrowUpRight, ShieldCheck } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 
 export const SignUp = () => {
 
+
+    const { store, dispatch } = useGlobalReducer()
     const navigate = useNavigate()
+
+    const [formData, setFormData] = useState({
+        fullName: "",
+        email: "",
+        password: "",
+        organizationName: "" // Nombre de la organización/empresa master
+    });
+
+    const handleChange = (e) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        try {
+            const baseUrl = import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:3001";
+            const response = await fetch(`${baseUrl}/api/signup`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                console.log("Registro exitoso:", data);
+
+                // 2. Guardamos un mensaje de bienvenida en el store global
+                dispatch({
+                    type: "set_hello",
+                    payload: `¡Bienvenido ${data.user.fullName}! Tu organización ${data.user.organization} ha sido creada.`
+                });
+
+                // 3. Redirigimos al login para que entre con sus nuevas credenciales
+                alert("Cuenta creada con éxito. Ahora puedes iniciar sesión.");
+                navigate("/login");
+            } else {
+                // Manejo de errores del backend (ej: email ya existe)
+                console.error("Error en el registro:", data.msg);
+                alert(`Error: ${data.msg}`);
+            }
+
+        } catch (error) {
+            console.error("Error de red:", error);
+            alert("No se pudo conectar con el servidor. Verifica que Flask esté corriendo.");
+        }
+    };
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 min-h-screen w-full font-sans bg-slate-50">
@@ -21,53 +72,65 @@ export const SignUp = () => {
 
 
                     {/* Formulario de Registro */}
-                    <form className="space-y-6">
-
-                        {/* Input de Nombre Completo */}
+                    <form className="space-y-5" onSubmit={handleSubmit}>
+                        {/* Campo: Nombre de la Organización */}
                         <div>
-                            <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1">
-                                Nombre completo
-                            </label>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Nombre de tu Negocio / Organización</label>
                             <input
                                 type="text"
-                                id="name"
-                                name="name"
-                                placeholder="Juan Pérez"
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-1 focus:ring-green-700/50 focus:border-green-700 transition-all text-sm"
+                                name="organizationName"
+                                value={formData.organizationName}
+                                onChange={handleChange}
+                                required
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-green-700/20 focus:border-green-700 outline-none transition-all"
+                                placeholder="Ej: Inversiones Villarreal C.A."
                             />
                         </div>
 
-                        {/* Input de Correo Empresarial */}
+                        {/* Campo: Nombre Completo */}
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
-                                Tu correo empresarial
-                            </label>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Tu Nombre (Administrador Master)</label>
+                            <input
+                                type="text"
+                                name="fullName"
+                                value={formData.fullName}
+                                onChange={handleChange}
+                                required
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-green-700/20 focus:border-green-700 outline-none transition-all"
+                                placeholder="Antonio Villarreal"
+                            />
+                        </div>
+
+                        {/* Campo: Email */}
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Correo Electrónico</label>
                             <input
                                 type="email"
-                                id="email"
                                 name="email"
-                                placeholder="tuempresa@correo.com"
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-1 focus:ring-green-700/50 focus:border-green-700 transition-all text-sm"
+                                value={formData.email}
+                                onChange={handleChange}
+                                required
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-green-700/20 focus:border-green-700 outline-none transition-all"
+                                placeholder="admin@tuempresa.com"
                             />
                         </div>
 
-                        {/* Input de Contraseña */}
+                        {/* Campo: Password */}
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
-                                Contraseña
-                            </label>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Contraseña</label>
                             <input
                                 type="password"
-                                id="password"
                                 name="password"
+                                value={formData.password}
+                                onChange={handleChange}
+                                required
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-green-700/20 focus:border-green-700 outline-none transition-all"
                                 placeholder="••••••••"
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-1 focus:ring-green-700/50 focus:border-green-700 transition-all text-sm"
                             />
                         </div>
 
-                        {/* Botón Principal de Sign Up (Estilo CortexApp) */}
-                        <button className="w-full flex items-center justify-center gap-2 bg-green-800 text-white px-8 py-3 rounded-xl sm:!rounded-full font-bold hover:bg-green-950 transition-all whitespace-nowrap shadow-lg shadow-cyan-900/20 text-sm md:text-base mb-6">
-                            Crear cuenta gratuita <ArrowUpRight size={20} />
+                        <button type="submit" className="w-full bg-green-800 text-white py-4 rounded-xl font-bold hover:bg-green-950 transition-all shadow-lg shadow-green-900/20 flex items-center justify-center gap-2">
+                            Crear Organización Master <ArrowUpRight size={20} />
                         </button>
                     </form>
 
@@ -94,7 +157,7 @@ export const SignUp = () => {
             </div>
 
             {/* Lado Derecho: Imagen y Mensaje (Inspirado en AWS, Oculto en móviles) */}
-            <div className="hidden lg:flex items-center justify-center p-12 bg-slate-800 relative overflow-hidden">
+            <div className="hidden lg:flex items-center justify-center p-12 bg-slate-800 relative overflow-hidden animate-gradient-slow">
                 {/* Capa de Partículas (Puntos) */}
                 <div className="absolute inset-0 opacity-20"
                     style={{
@@ -112,7 +175,7 @@ export const SignUp = () => {
                     </p>
 
                     {/* Elemento Visual Sutil (Como el Mockup del Hero, pero adaptado) */}
-                    <div className="bg-slate-700/50 p-4 rounded-3xl shadow-2xl border border-slate-600/50 relative mt-12 mx-auto lg:mx-0 backdrop-blur-sm">
+                    <div className="bg-slate-700/20 p-2 rounded-3xl shadow-2xl border border-slate-600/50 relative mt-12 mx-auto lg:mx-0 backdrop-blur-sm">
                         <div className="bg-slate-900 rounded-2xl h-80 overflow-hidden relative group">
 
                             {/* Header del Mockup (Simula una ventana de App) */}
@@ -160,10 +223,20 @@ export const SignUp = () => {
                                 </div>
                             </div>
 
-                            {/* Overlay con Icono Central (Tu idea original pero más integrada) */}
-                            <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                                <div className="bg-green-800 p-4 rounded-full shadow-lg shadow-green-900/40 transform scale-75 group-hover:scale-100 transition-transform duration-500">
-                                    <UserPlus className="text-white" size={32} />
+                            {/* Overlay con efecto Blur en Hover */}
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-500">
+
+                                {/* Icono de Seguridad */}
+                                <div className="bg-green-500 p-4 rounded-full shadow-2xl shadow-green-900/40 transform scale-75 group-hover:scale-100 transition-transform duration-500 mb-4">
+                                    <ShieldCheck className="text-white" size={32} />
+                                </div>
+
+                                {/* Texto Informativo */}
+                                <div className="text-center px-6 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
+                                    <p className="text-white font-bold text-lg">Tus finanzas seguras</p>
+                                    <p className="text-slate-300 text-xs mt-1">
+                                        Infraestructura auditada y respaldada por AWS Cloud.
+                                    </p>
                                 </div>
                             </div>
                         </div>
