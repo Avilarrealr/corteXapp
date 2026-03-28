@@ -1,9 +1,51 @@
-import React from "react";
+import React, { useState } from "react";
 import { ArrowRight, Wallet, TrendingUp, ShieldCheck, CheckCircle } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
+import useGlobalReducer from "../hooks/useGlobalReducer";
 
 export const Login = () => {
+
+    const { store, dispatch } = useGlobalReducer()
     const navigate = useNavigate();
+
+    const [formData, setFormData] = useState({
+        email: "",
+        password: ""
+    });
+
+    const handleChange = (e) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    }
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        const baseUrl = import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:3001";
+
+        try {
+            const response = await fetch(`${baseUrl}/api/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData) // formData debe tener email y password
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+
+                localStorage.setItem("token", data.token);
+                dispatch({
+                    type: "login_user",
+                    payload: data.user
+                });
+                navigate("/dashboard");
+
+            } else {
+                alert(data.msg);
+            }
+        } catch (error) {
+            console.error("Error en el login:", error);
+        }
+    };
 
     return (
         /* Contenedor Principal: Grid de 2 columnas con alto total */
@@ -19,11 +61,15 @@ export const Login = () => {
                         <p className="text-slate-500 mt-2">Gestiona tus ingresos y cortes de caja con precisión.</p>
                     </div>
 
-                    <form className="space-y-6">
+                    <form className="space-y-6" onSubmit={handleSubmit}>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-2">Correo Electrónico</label>
                             <input
                                 type="email"
+                                name="email" // 6. Importante: debe coincidir con la llave del state
+                                value={formData.email}
+                                onChange={handleChange}
+                                required
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-green-700/20 focus:border-green-700 outline-none transition-all placeholder:text-slate-400"
                                 placeholder="tu@correo.com"
                             />
@@ -36,12 +82,16 @@ export const Login = () => {
                             </div>
                             <input
                                 type="password"
+                                name="password" // 7. Importante: debe coincidir con la llave del state
+                                value={formData.password}
+                                onChange={handleChange}
+                                required
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-green-700/20 focus:border-green-700 outline-none transition-all placeholder:text-slate-400"
                                 placeholder="••••••••"
                             />
                         </div>
 
-                        <button className="w-full bg-green-800 text-white py-4 rounded-xl font-bold hover:bg-green-950 transition-all shadow-lg shadow-green-900/20 flex items-center justify-center gap-2">
+                        <button type="submit" className="w-full bg-green-800 text-white py-4 rounded-xl font-bold hover:bg-green-950 transition-all shadow-lg shadow-green-900/20 flex items-center justify-center gap-2">
                             Entrar al Panel <ArrowRight size={20} />
                         </button>
                     </form>

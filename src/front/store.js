@@ -1,38 +1,34 @@
-export const initialStore=()=>{
-  return{
-    message: null,
-    todos: [
-      {
-        id: 1,
-        title: "Make the bed",
-        background: null,
-      },
-      {
-        id: 2,
-        title: "Do my homework",
-        background: null,
-      }
-    ]
+export const initialStore = () => {
+  return {
+    user: null,    // Aquí guardaremos los datos de Antonio (full_name, email, etc.)
+    token: null,   // Podemos guardar el token también en memoria si quieres
+    message: null, // Útil para mostrar notificaciones
   }
 }
 
 export default function storeReducer(store, action = {}) {
-  switch(action.type){
+  switch (action.type) {
+    case 'login_user':
+      return {
+        ...store,
+        user: action.payload // Guardamos el objeto del usuario que viene del backend
+      };
+
+    case 'logout_user':
+      return {
+        ...store,
+        user: null,
+        token: null
+      };
+
     case 'set_hello':
       return {
         ...store,
         message: action.payload
       };
-      
-    case 'add_task':
 
-      const { id,  color } = action.payload
-
-      return {
-        ...store,
-        todos: store.todos.map((todo) => (todo.id === id ? { ...todo, background: color } : todo))
-      };
+    // Cambiamos el 'throw Error' por 'return store' para evitar pantallas blancas
     default:
-      throw Error('Unknown action.');
-  }    
+      return store;
+  }
 }

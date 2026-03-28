@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import String, Boolean, Integer, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
@@ -29,6 +30,16 @@ class User(db.Model):
         Integer, ForeignKey("organization.id"), nullable=False
     )
     organization = relationship("Organization", back_populates="users")
+
+    def __init__(self, **kwargs):
+        # Al crear el usuario, encriptamos la clave antes de guardarla
+        if "password" in kwargs:
+            kwargs["password"] = generate_password_hash(kwargs["password"])
+        super(User, self).__init__(**kwargs)
+
+    def check_password(self, password):
+        # Este método servirá para el Login
+        return check_password_hash(self.password, password)
 
     def serialize(self):
         return {
