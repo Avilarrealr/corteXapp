@@ -8,10 +8,12 @@ db = SQLAlchemy()
 
 class Organization(db.Model):
     __tablename__ = "organization"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
 
-    users = relationship("User", back_populates="organization")
+    # Relaciones para acceder fácil desde el objeto
+    users = db.relationship("User", backref="organization", lazy=True)
+    companies = db.relationship("Company", backref="organization", lazy=True)
 
     def serialize(self):
         return {"id": self.id, "name": self.name}
@@ -19,33 +21,49 @@ class Organization(db.Model):
 
 class User(db.Model):
     __tablename__ = "user"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    full_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
-    password: Mapped[str] = mapped_column(String(255), nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean(), default=True)
-    role: Mapped[str] = mapped_column(String(20), default="master")
+    id = db.Column(db.Integer, primary_key=True)
+    full_name = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password = db.Column(db.String(255), nullable=False)
 
-    organization_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("organization.id"), nullable=False
+    # Nuevo: Rol para diferenciar Admin de Cajero
+    role = db.Column(db.String(20), default="admin")  # "admin" o "cajero"
+
+    # Nuevo: Relación opcional con una Sede (solo para cajeros)
+    company_id = db.Column(db.Integer, db.ForeignKey("company.id"), nullable=True)
+
+    # Relación con la Organización (tu cuenta principal)
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organization.id"), nullable=False
     )
-    organization = relationship("Organization", back_populates="users")
 
-    def __init__(self, **kwargs):
-        # Al crear el usuario, encriptamos la clave antes de guardarla
-        if "password" in kwargs:
-            kwargs["password"] = generate_password_hash(kwargs["password"])
-        super(User, self).__init__(**kwargs)
+    def __repr__(self):
+        return f"<User {self.email}>"
 
     def check_password(self, password):
-        # Este método servirá para el Login
         return check_password_hash(self.password, password)
 
     def serialize(self):
         return {
             "id": self.id,
-            "email": self.email,
             "full_name": self.full_name,
+            "email": self.email,
             "role": self.role,
-            "organization": self.organization.name if self.organization else None,
+            "company_id": self.company_id,
+            "organization_id": self.organization_id,  # Útil tenerlo en el JSON
         }
+
+
+class Company(db.Model):
+    __tablename__ = "company"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    address = db.Column(db.String(255), nullable=True)
+    # Relación con la Organización principal
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organization.id"), nullable=False
+    )
+    cashiers = db.relationship("User", backref="company", lazy=True)
+
+    def serialize(self):
+        return {"id": self.id, "name": self.name, "address": self.address}
