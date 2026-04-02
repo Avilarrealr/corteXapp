@@ -37,7 +37,11 @@ export const Login = () => {
                     type: "login_user",
                     payload: data.user
                 });
-                navigate("/dashboard");
+                if (data.user.role === "admin") {
+                    navigate("/dashboard");
+                } else if (data.user.role === "cajero") {
+                    navigate("/pos");
+                }
 
             } else {
                 alert(data.msg);

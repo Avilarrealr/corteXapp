@@ -9,6 +9,7 @@ import { Login } from "./pages/Login";
 import { SignUp } from "./pages/SignUp";
 import { Dashboard } from "./pages/Dashboard"; // Asumiendo que tienes esta página
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { CashierPanel } from "./pages/CashierPanel";
 
 export const router = createBrowserRouter(
   createRoutesFromElements(
@@ -19,12 +20,22 @@ export const router = createBrowserRouter(
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<SignUp />} />
 
-      {/* Ruta Protegida: Solo usuarios con token pueden entrar */}
+      {/* Ruta para el Dueño/Admin */}
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute roleRequired="admin">
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Ruta para el Operativo/Cajero */}
+      <Route
+        path="/pos"
+        element={
+          <ProtectedRoute roleRequired="cajero">
+            <CashierPanel />
           </ProtectedRoute>
         }
       />

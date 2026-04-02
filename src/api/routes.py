@@ -1,9 +1,10 @@
 from flask import Flask, request, jsonify, url_for, Blueprint
-from api.models import db, User, Organization, Company
+from api.models import db, User, Organization, Company, CashShift
 from api.utils import generate_sitemap, APIException
 from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
 from werkzeug.security import generate_password_hash
+from datetime import datetime
 
 api = Blueprint("api", __name__)
 
@@ -147,3 +148,77 @@ def delete_company(company_id):
     db.session.commit()
 
     return jsonify({"done": True, "msg": "Sede eliminada"}), 200
+
+
+# 1. ABRIR TURNO
+@api.route("/cash-shift/open", methods=["POST"])
+@jwt_required()
+def open_shift():
+    cashier_id = get_jwt_identity()
+    body = request.get_json()
+
+    # Verificamos si ya tiene un turno abierto
+    active_shift = CashShift.query.filter_by(
+        cashier_id=cashier_id, status="open"
+    ).first()
+    if active_shift:
+        return jsonify({"msg": "Ya tienes un turno abierto"}), 400
+
+    # CAMBIO AQUÍ: Usar las llaves nuevas que envía el frontend
+    new_shift = CashShift(
+        open_amount_usd=body.get("open_amount_usd", 0),  # Cambiado de open_amount
+        open_amount_bs=body.get("open_amount_bs", 0),  # Nueva llave
+        cashier_id=cashier_id,
+        company_id=body["company_id"],
+        status="open",
+        opened_at=datetime.utcnow(),
+    )
+
+    db.session.add(new_shift)
+    db.session.commit()
+    return jsonify({"msg": "Turno abierto con éxito", "shift": new_shift.id}), 201
+
+
+# 2. CERRAR TURNO (El formulario del cajero)
+@api.route("/cash-shift/close", methods=["PUT"])
+@jwt_required()
+def close_shift():
+    cashier_id = get_jwt_identity()
+    body = request.get_json()
+
+    shift = CashShift.query.filter_by(cashier_id=cashier_id, status="open").first()
+    if not shift:
+        return jsonify({"msg": "No hay un turno activo"}), 404
+
+    # Guardamos la declaración física del cajero
+    shift.close_cash_usd = body.get("close_cash_usd", 0)
+    shift.close_cash_bs = body.get("close_cash_bs", 0)
+    shift.close_zelle = body.get("close_zelle", 0)
+    shift.close_pagomovil = body.get("close_pagomovil", 0)
+    shift.close_biopago = body.get("close_biopago", 0)
+    shift.close_punto = body.get("close_punto", 0)
+
+    shift.status = "closed"
+    shift.closed_at = datetime.utcnow()
+
+    db.session.commit()
+    return jsonify({"msg": "Turno cerrado exitosamente"}), 200
+
+
+@api.route("/cash-shift/active", methods=["GET"])
+@jwt_required()
+def get_active_shift():
+    cashier_id = get_jwt_identity()
+    shift = CashShift.query.filter_by(cashier_id=cashier_id, status="open").first()
+
+    if not shift:
+        return jsonify({"msg": "No hay turno activo"}), 404
+
+    return jsonify(
+        {
+            "id": shift.id,
+            "open_amount_usd": shift.open_amount_usd,  # Cambio aquí
+            "open_amount_bs": shift.open_amount_bs,  # Cambio aquí
+            "opened_at": shift.opened_at,
+        }
+    ), 200

@@ -67,3 +67,27 @@ class Company(db.Model):
 
     def serialize(self):
         return {"id": self.id, "name": self.name, "address": self.address}
+
+
+class CashShift(db.Model):
+    __tablename__ = "cash_shift"
+    id = db.Column(db.Integer, primary_key=True)
+
+    # APERTURA (Solo efectivo)
+    open_amount_usd = db.Column(db.Float, default=0.0)
+    open_amount_bs = db.Column(db.Float, default=0.0)
+
+    # CIERRE (Las 6 posibilidades)
+    close_cash_usd = db.Column(db.Float, default=0.0)
+    close_cash_bs = db.Column(db.Float, default=0.0)
+    close_zelle = db.Column(db.Float, default=0.0)
+    close_pagomovil = db.Column(db.Float, default=0.0)
+    close_biopago = db.Column(db.Float, default=0.0)
+    close_punto = db.Column(db.Float, default=0.0)
+
+    status = db.Column(db.String(20), default="open")  # "open" o "closed"
+    opened_at = db.Column(db.DateTime, default=db.func.now())
+    closed_at = db.Column(db.DateTime, nullable=True)
+
+    cashier_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    company_id = db.Column(db.Integer, db.ForeignKey("company.id"), nullable=False)
