@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     LayoutDashboard, Building2, Users, ReceiptIndianRupee,
-    Settings, LogOut, UserCircle, Menu, X
+    Settings, LogOut, UserCircle, Menu, X, Calendar, DollarSign, ClipboardCheck, AlertCircle
 } from 'lucide-react';
 import useGlobalReducer from "../hooks/useGlobalReducer";
 
@@ -19,12 +19,75 @@ export const Dashboard = () => {
 
     const [cashiers, setCashiers] = useState([]);
 
+    // 1. Estados para el resumen y las fechas
+    const [summary, setSummary] = useState({
+        totals: { usd_cash: 0, bs_cash: 0, zelle: 0, pagomovil: 0, biopago: 0, punto: 0 },
+        total_shifts: 0,
+        grand_total_usd: 0
+    });
+
+    // Por defecto: hoy
+    const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+    const [loading, setLoading] = useState(true);
+
+    const [tasa, setTasa] = useState(36.50); // Valor inicial por defecto
+    const [isSavingTasa, setIsSavingTasa] = useState(false);
+
     // Extraemos el nombre del usuario
     const userName = store.user?.full_name || "Antonio";
 
     const handleLogout = () => {
         localStorage.removeItem("token");
         navigate("/login");
+    };
+
+
+    // Función para enviar la tasa al backend
+    const handleSaveTasa = async () => {
+        setIsSavingTasa(true);
+        try {
+            const resp = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/exchange-rate`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${localStorage.getItem("token")}`
+                },
+                body: JSON.stringify({
+                    rate: parseFloat(tasa),
+                    date: dateFilter // Se guarda para la fecha que estás auditando
+                })
+            });
+            if (resp.ok) {
+                alert("Tasa actualizada y auditoría recalculada");
+                fetchAuditData(); // Refrescamos los números del dashboard
+            }
+        } catch (error) {
+            console.error("Error guardando tasa:", error);
+        } finally {
+            setIsSavingTasa(false);
+        }
+    };
+
+    // 2. Función para obtener la auditoría
+    const fetchAuditData = async () => {
+        setLoading(true);
+        try {
+            // PASAMOS LA TASA POR URL
+            const resp = await fetch(
+                `${import.meta.env.VITE_BACKEND_URL}/api/admin/audit-summary?start_date=${dateFilter}&end_date=${dateFilter}&tasa=${tasa}`,
+                {
+                    headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
+                }
+            );
+            if (resp.ok) {
+                const data = await resp.json();
+                setSummary(data);
+            }
+        } catch (error) {
+            console.error("Error cargando auditoría:", error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleDeleteCompany = async (id, name) => {
@@ -142,6 +205,23 @@ export const Dashboard = () => {
         }
     }
 
+    // Función para obtener la tasa de una fecha específica
+    const fetchTodayRate = async () => {
+        try {
+            const resp = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/get-rate?date=${dateFilter}`, {
+                headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                setTasa(data.rate); // Actualiza el input con lo que hay en DB
+            } else {
+                setTasa(36.50); // Valor de respaldo si no hay nada en DB para ese día
+            }
+        } catch (error) {
+            console.error("Error obteniendo tasa:", error);
+        }
+    };
+
     useEffect(() => {
         fetchCompanies();
     }, []); // Se ejecuta una sola vez al montar el componente
@@ -152,6 +232,12 @@ export const Dashboard = () => {
             fetchCashiers(selectedCompany.id);
         }
     }, [selectedCompany]);
+
+    useEffect(() => { fetchAuditData(); }, [dateFilter]);
+
+    useEffect(() => {
+        fetchTodayRate();
+    }, [dateFilter]);
 
     return (
         <div className="flex flex-col md:flex-row min-h-screen bg-slate-50">
@@ -166,38 +252,27 @@ export const Dashboard = () => {
                 </button>
             </header>
 
-            {/* SIDEBAR VERTICAL (Responsive) */}
+            {/* SIDEBAR VERTICAL */}
             <aside className={`w-64 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 z-40
                 transition-transform duration-300 ease-in-out
                 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
                 absolute md:relative inset-y-0 left-0 md:translate-x-0 
                 h-full md:min-h-screen`
             }>
-                {/* Logo (Oculto en móvil ya que está en el header) */}
                 <div className="hidden md:block p-6">
                     <h1 className="text-2xl font-black text-white italic">Cortex<span className="text-green-500">App</span></h1>
                 </div>
 
-                {/* Navegación (Se ajusta para móvil y tablet) */}
                 <nav className="flex-1 px-4 mt-8 md:mt-0 space-y-2 overflow-y-auto">
                     <NavItem icon={<LayoutDashboard size={20} />} label="Resumen" active />
-
-                    {/* Ahora le pasamos la función directamente a Sub-Empresas */}
-                    <NavItem
-                        icon={<Building2 size={20} />}
-                        label="Sub-Empresas"
-                        onClick={handleCreateCompany}
-                    />
-
+                    <NavItem icon={<Building2 size={20} />} label="Sub-Empresas" onClick={handleCreateCompany} />
                     <NavItem icon={<Users size={20} />} label="Cajeros" onClick={() => { handleCreateCompany() }} />
                     <NavItem icon={<ReceiptIndianRupee size={20} />} label="Cortes de Caja" />
-
                     <div className="pt-4 mt-4 border-t border-slate-800">
                         <NavItem icon={<Settings size={20} />} label="Configuración" />
                     </div>
                 </nav>
 
-                {/* Perfil (Siempre abajo) */}
                 <div className="p-4 border-t border-slate-800 bg-slate-900/50 mt-auto">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="p-2 bg-green-500/20 rounded-lg text-green-500">
@@ -208,148 +283,208 @@ export const Dashboard = () => {
                             <p className="text-[10px] uppercase tracking-wider text-slate-500">Admin Master</p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-red-400 hover:bg-red-500/10 rounded-lg transition-all border border-red-500/20"
-                    >
+                    <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-red-400 hover:bg-red-500/10 rounded-lg transition-all border border-red-500/20">
                         <LogOut size={14} /> Cerrar Sesión
                     </button>
                 </div>
             </aside>
 
-            {/* OVERLAY para cerrar el menú en móvil al tocar fuera */}
-            {isSidebarOpen && (
-                <div
-                    onClick={toggleSidebar}
-                    className="fixed inset-0 bg-black/50 z-30 md:hidden"
-                />
-            )}
+            {isSidebarOpen && <div onClick={toggleSidebar} className="fixed inset-0 bg-black/50 z-30 md:hidden" />}
 
-            {/* CONTENIDO PRINCIPAL (Centrado y Responsive) */}
+            {/* CONTENIDO PRINCIPAL */}
             <main className="flex-1 p-6 md:p-12 overflow-y-auto w-full md:w-auto">
-                <header className="mb-12 text-left md:text-left">
-                    <h2 className="text-4xl md:text-5xl font-black text-slate-900 leading-tight">
-                        ¡Bienvenido de nuevo, <span className="text-green-700">{userName.split(' ')[0]}</span>!
-                    </h2>
-                    <p className="text-slate-500 mt-2 text-lg md:text-xl max-w-xl">
-                        Aquí tienes un resumen de la actividad de hoy para tu organización.
-                    </p>
+                <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                    <div>
+                        <h2 className="text-4xl md:text-5xl font-black text-slate-900 leading-tight">
+                            ¡Bienvenido, <span className="text-green-700">{userName.split(' ')[0]}</span>!
+                        </h2>
+                        <p className="text-slate-500 mt-2 text-lg">Resumen de actividad para tu organización.</p>
+                    </div>
+
+                    {/* SELECTOR DE FECHA */}
+                    <div className="flex flex-col items-start md:items-end gap-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Auditar Fecha:</label>
+                        <div className="relative group">
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-green-600 transition-colors" size={16} />
+                            <input
+                                type="date"
+                                value={dateFilter}
+                                onChange={(e) => setDateFilter(e.target.value)}
+                                className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-green-500/10 focus:border-green-500 transition-all cursor-pointer shadow-sm"
+                            />
+                        </div>
+                    </div>
                 </header>
 
-                {/* GRID DE ESTADÍSTICAS (Ajustado para móvil) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <StatCard title="Ingresos Totales" value="$0.00" color="green" />
-                    <StatCard title="Cortes Realizados" value="0" color="blue" />
-                    <StatCard title="Alertas de Caja" value="Sin novedades" color="amber" />
-                </div>
-                {/* SECCIÓN DE SELECCIÓN DE EMPRESA */}
-                <section className="mt-10">
-                    <h3 className="text-xl font-bold text-slate-800 mb-6">Selecciona una Sede para gestionar:</h3>
+                {/* PANEL DE TASA DE CAMBIO */}
+                <div className="bg-slate-900 p-6 rounded-[2rem] mb-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-blue-900/10 border border-slate-800">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-400">
+                            <DollarSign size={24} />
+                        </div>
+                        <div>
+                            <h4 className="text-white font-black text-lg">Tasa Oficial BCV</h4>
+                            <p className="text-slate-400 text-xs font-medium uppercase tracking-widest">Configuración bimoneda activa</p>
+                        </div>
+                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-center gap-3 bg-slate-800 p-2 rounded-2xl border border-slate-700">
+                        <span className="pl-4 text-slate-500 font-bold text-sm">Bs.</span>
+                        <input
+                            type="number"
+                            value={tasa}
+                            onChange={(e) => setTasa(e.target.value)}
+                            className="w-24 bg-transparent text-white font-black text-xl outline-none"
+                            placeholder="0.00"
+                        />
+                        <button
+                            onClick={handleSaveTasa}
+                            disabled={isSavingTasa}
+                            className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-xl font-bold transition-all flex items-center gap-2 disabled:opacity-50"
+                        >
+                            {isSavingTasa ? "..." : "ACTUALIZAR"}
+                        </button>
+                    </div>
+                </div>
+
+                {/* GRID DE ESTADÍSTICAS PRINCIPALES */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                    <StatCard
+                        title="Ingresos Totales"
+                        value={`$${summary.grand_total_usd.toFixed(2)}`}
+                        icon={<DollarSign className="text-green-600" />}
+                        loading={loading}
+                    />
+                    <StatCard
+                        title="Cortes Realizados"
+                        value={summary.total_shifts}
+                        icon={<ClipboardCheck className="text-blue-600" />}
+                        loading={loading}
+                    />
+                    <StatCard
+                        title="Alertas de Caja"
+                        value="0"
+                        icon={<AlertCircle className="text-amber-500" />}
+                        loading={loading}
+                    />
+                </div>
+
+                {/* DESGLOSE POR MÉTODO (La nueva sección) */}
+                <section className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm mb-12">
+                    <div className="flex items-center gap-2 mb-8">
+                        <div className="h-1 w-8 bg-green-500 rounded-full"></div>
+                        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Flujo de Efectivo Detallado</h3>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <MiniStat label="Efectivo $" value={summary.totals.usd_cash} color="text-green-600" bg="bg-green-50" />
+                        <MiniStat label="Efectivo Bs" value={summary.totals.bs_cash} color="text-blue-600" bg="bg-blue-50" />
+                        <MiniStat label="Zelle" value={summary.totals.zelle} color="text-purple-600" bg="bg-purple-50" />
+                        <MiniStat label="Pago Móvil" value={summary.totals.pagomovil} color="text-orange-600" bg="bg-orange-50" />
+                        <MiniStat label="Biopago" value={summary.totals.biopago} color="text-teal-600" bg="bg-teal-50" />
+                        <MiniStat label="Punto" value={summary.totals.punto} color="text-yellow-600" bg="bg-yellow-50" />
+                    </div>
+                </section>
+
+                {/* SECCIÓN DE SELECCIÓN DE SEDE */}
+                <section className="mt-10">
+                    <div className="flex items-center justify-between mb-8">
+                        <h3 className="text-2xl font-black text-slate-800 italic">Sedes Registradas</h3>
+                        <div className="h-px flex-1 bg-slate-100 mx-6"></div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {companies.map((company) => (
                             <div key={company.id} className="relative group">
                                 <div
-                                    onClick={(e) => {
-                                        e.stopPropagation(); // Evita que el clic llegue al fondo del Dashboard
-                                        setSelectedCompany(company);
-                                    }}
-                                    className={`p-6 rounded-2xl border-2 cursor-pointer transition-all ${selectedCompany?.id === company.id
-                                        ? "border-green-500 bg-green-50 shadow-md"
-                                        : "border-slate-200 bg-white hover:border-slate-300"
+                                    onClick={() => setSelectedCompany(company)}
+                                    className={`p-8 rounded-[2rem] border-2 cursor-pointer transition-all duration-300 ${selectedCompany?.id === company.id
+                                        ? "border-green-500 bg-green-50 shadow-xl shadow-green-900/5 -translate-y-1"
+                                        : "border-slate-100 bg-white hover:border-slate-300 shadow-sm hover:shadow-md"
                                         }`}
                                 >
                                     <div className="flex items-center justify-between">
-                                        <Building2 className={selectedCompany?.id === company.id ? "text-green-600" : "text-slate-400"} />
-
-                                        {/* Badge de 'Activa' movido a la izquierda para no chocar con la X */}
+                                        <div className={`p-3 rounded-2xl ${selectedCompany?.id === company.id ? 'bg-green-600 text-white' : 'bg-slate-50 text-slate-400'}`}>
+                                            <Building2 size={24} />
+                                        </div>
                                         {selectedCompany?.id === company.id && (
-                                            <span className="mr-6 text-[10px] bg-green-600 text-white px-2 py-1 rounded-full font-bold uppercase animate-in zoom-in">
-                                                Activa
+                                            <span className="text-[10px] bg-green-600 text-white px-3 py-1 rounded-full font-black uppercase tracking-tighter">
+                                                Seleccionada
                                             </span>
                                         )}
                                     </div>
-                                    <h4 className="mt-4 font-black text-slate-900 text-lg">{company.name}</h4>
-                                    <p className="text-slate-500 text-sm">{company.address || "Sin dirección registrada"}</p>
+                                    <h4 className="mt-6 font-black text-slate-900 text-xl">{company.name}</h4>
+                                    <p className="text-slate-500 text-sm mt-1">{company.address || "Boconó, Venezuela"}</p>
                                 </div>
 
-                                {/* Botón X con mejor contraste y área de clic */}
                                 <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteCompany(company.id, company.name);
-                                    }}
-                                    className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all z-20"
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteCompany(company.id, company.name); }}
+                                    className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
                                 >
-                                    <X size={14} />
+                                    <X size={18} />
                                 </button>
                             </div>
                         ))}
 
-                        {/* Botón rápido para añadir más desde el grid */}
                         <button
-                            onClick={() => {
-                                handleCreateCompany();
-                            }}
-                            className="flex flex-col items-center justify-center text-center p-6 min-h-[160px] rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-green-400 hover:text-green-600 hover:bg-green-50 transition-all shadow-inner group"
+                            onClick={handleCreateCompany}
+                            className="flex flex-col items-center justify-center p-8 rounded-[2rem] border-2 border-dashed border-slate-200 bg-slate-50 text-slate-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50/50 transition-all group"
                         >
-                            {/* Ícono grande y centrado */}
-                            <div className="p-3 bg-white rounded-full border border-slate-200 group-hover:border-green-100 transition-colors">
-                                <Building2 size={32} className="text-slate-300 group-hover:text-green-500 transition-colors" />
+                            <div className="p-4 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                                <Building2 size={32} className="text-slate-300 group-hover:text-green-500" />
                             </div>
-
-                            {/* Texto de Acción */}
-                            <span className="mt-4 text-sm font-bold block">+ Añadir Sede</span>
-                            <span className="text-xs text-slate-400 block group-hover:text-green-500/80 transition-colors">Crea una nueva ubicación</span>
+                            <span className="mt-4 text-sm font-bold tracking-tight">+ Añadir Nueva Sede</span>
                         </button>
                     </div>
                 </section>
+
+                {/* GESTIÓN DE CAJEROS (Sólo si hay sede seleccionada) */}
                 {selectedCompany && (
-                    <div className="mt-8 space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                        {/* Header de Gestión */}
-                        <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div className="mt-12 space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-500">
+                        <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white flex flex-col md:flex-row items-center justify-between gap-6">
                             <div>
-                                <h3 className="text-2xl font-black text-slate-900 italic">
-                                    Sede: <span className="text-green-600">{selectedCompany.name}</span>
+                                <p className="text-green-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Gestión de Personal</p>
+                                <h3 className="text-3xl font-black">
+                                    Sede: <span className="italic">{selectedCompany.name}</span>
                                 </h3>
-                                <p className="text-slate-500 text-sm">Control de personal y operaciones activas.</p>
                             </div>
                             <button
                                 onClick={handleAddCashier}
-                                className="flex items-center gap-2 bg-green-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg shadow-green-900/10"
+                                className="w-full md:w-auto flex items-center justify-center gap-2 bg-green-500 text-slate-900 px-8 py-4 rounded-2xl font-black hover:bg-green-400 transition-all"
                             >
-                                <Users size={18} /> + Nuevo Cajero
+                                <Users size={20} /> REGISTRAR CAJERO
                             </button>
                         </div>
 
-                        {/* Lista de Cajeros */}
-                        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-                            <div className="p-4 bg-slate-50 border-b border-slate-200">
-                                <h4 className="font-bold text-slate-700 flex items-center gap-2">
-                                    <UserCircle size={18} className="text-slate-400" /> Personal Asignado
+                        <div className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm">
+                            <div className="p-6 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+                                <h4 className="font-bold text-slate-700 flex items-center gap-2 uppercase text-xs tracking-widest">
+                                    Personal en Nómina
                                 </h4>
+                                <span className="text-xs font-bold text-slate-400">{cashiers.length} usuarios</span>
                             </div>
-                            <div className="divide-y divide-slate-100">
+                            <div className="divide-y divide-slate-50">
                                 {cashiers.length > 0 ? (
                                     cashiers.map(cashier => (
-                                        <div key={cashier.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold">
+                                        <div key={cashier.id} className="p-6 flex items-center justify-between hover:bg-slate-50/80 transition-all">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-900 font-black text-xl">
                                                     {cashier.full_name.charAt(0)}
                                                 </div>
                                                 <div>
-                                                    <p className="font-bold text-slate-900">{cashier.full_name}</p>
-                                                    <p className="text-xs text-slate-500">{cashier.email}</p>
+                                                    <p className="font-black text-slate-900">{cashier.full_name}</p>
+                                                    <p className="text-xs text-slate-400 font-medium">{cashier.email}</p>
                                                 </div>
                                             </div>
-                                            <span className="text-[10px] font-black uppercase px-2 py-1 bg-slate-100 text-slate-500 rounded-md">
-                                                {cashier.role}
-                                            </span>
+                                            <div className="flex items-center gap-4">
+                                                <span className="text-[10px] font-black uppercase px-3 py-1.5 bg-green-100 text-green-700 rounded-lg">
+                                                    {cashier.role}
+                                                </span>
+                                            </div>
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="p-8 text-center text-slate-400 italic text-sm">
-                                        No hay cajeros registrados en esta sede aún.
+                                    <div className="p-12 text-center">
+                                        <p className="text-slate-400 font-medium italic">No hay cajeros asignados a esta ubicación.</p>
                                     </div>
                                 )}
                             </div>
@@ -357,7 +492,7 @@ export const Dashboard = () => {
                     </div>
                 )}
             </main>
-        </div >
+        </div>
     );
 };
 
@@ -373,9 +508,25 @@ const NavItem = ({ icon, label, active = false, onClick }) => ( // Añadimos onC
     </div>
 );
 
-const StatCard = ({ title, value, color }) => (
-    <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm transition-all hover:border-green-100 hover:shadow-lg">
-        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-2">{title}</p>
-        <p className="text-4xl md:text-5xl font-black text-slate-900">{value}</p>
+const StatCard = ({ title, value, icon, loading }) => (
+    <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl hover:border-green-100 group">
+        <div className="flex justify-between items-start mb-6">
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">{title}</p>
+            <div className="p-3 bg-slate-50 rounded-2xl group-hover:bg-green-50 transition-colors">
+                {icon}
+            </div>
+        </div>
+        {loading ? (
+            <div className="h-10 w-2/3 bg-slate-100 animate-pulse rounded-xl"></div>
+        ) : (
+            <p className="text-4xl font-black text-slate-900 tracking-tighter">{value}</p>
+        )}
+    </div>
+);
+
+const MiniStat = ({ label, value, color, bg }) => (
+    <div className={`${bg} p-5 rounded-[1.5rem] border border-white transition-transform hover:scale-105`}>
+        <p className="text-slate-500 text-[9px] font-black uppercase tracking-widest mb-1">{label}</p>
+        <p className={`text-xl font-black ${color}`}>${value.toFixed(2)}</p>
     </div>
 );

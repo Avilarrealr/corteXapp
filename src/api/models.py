@@ -2,6 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import String, Boolean, Integer, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
 
 db = SQLAlchemy()
 
@@ -91,3 +92,23 @@ class CashShift(db.Model):
 
     cashier_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     company_id = db.Column(db.Integer, db.ForeignKey("company.id"), nullable=False)
+
+
+class ExchangeRate(db.Model):
+    __tablename__ = "exchange_rate"
+    id = db.Column(db.Integer, primary_key=True)
+    rate = db.Column(db.Float, nullable=False)  # Ejemplo: 36.55
+    date = db.Column(
+        db.Date, default=datetime.utcnow().date, unique=True
+    )  # Una tasa por día
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relación opcional con la empresa si decides que sea global o por sede
+    company_id = db.Column(db.Integer, db.ForeignKey("company.id"), nullable=True)
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "rate": self.rate,
+            "date": self.date.strftime("%Y-%m-%d"),
+        }

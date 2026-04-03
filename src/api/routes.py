@@ -1,10 +1,11 @@
 from flask import Flask, request, jsonify, url_for, Blueprint
-from api.models import db, User, Organization, Company, CashShift
+from api.models import db, User, Organization, Company, CashShift, ExchangeRate
 from api.utils import generate_sitemap, APIException
 from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
 from werkzeug.security import generate_password_hash
-from datetime import datetime
+from sqlalchemy import func
+from datetime import datetime, timedelta
 
 api = Blueprint("api", __name__)
 
@@ -222,3 +223,119 @@ def get_active_shift():
             "opened_at": shift.opened_at,
         }
     ), 200
+
+
+@api.route("/admin/audit-summary", methods=["GET"])
+@jwt_required()
+def get_audit_summary():
+    # Solo el admin debería acceder a esto
+    # (Asumiendo que guardas el rol en el token o lo verificas aquí)
+
+    # Parámetros de fecha (por defecto hoy)
+    start_date = request.args.get("start_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    end_date = request.args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
+    tasa_frontend = request.args.get("tasa")
+
+    # Si el frontend la envía, la usamos. Si no, buscamos la de la DB.
+    if tasa_frontend:
+        tasa_bcv = float(tasa_frontend)
+    else:
+        rate_obj = ExchangeRate.query.filter_by(date=datetime.utcnow().date()).first()
+        tasa_bcv = rate_obj.rate if rate_obj else 36.50
+
+    # Convertir strings a objetos datetime para el filtro
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+
+    # Consulta para sumar todos los métodos de turnos CERRADOS en ese rango
+    totals = (
+        db.session.query(
+            func.sum(CashShift.close_cash_usd).label("total_usd"),
+            func.sum(CashShift.close_cash_bs).label("total_bs"),
+            func.sum(CashShift.close_zelle).label("total_zelle"),
+            func.sum(CashShift.close_pagomovil).label("total_pagomovil"),
+            func.sum(CashShift.close_biopago).label("total_biopago"),
+            func.sum(CashShift.close_punto).label("total_punto"),
+            func.count(CashShift.id).label("count_shifts"),
+        )
+        .filter(
+            CashShift.status == "closed",
+            CashShift.closed_at >= start_dt,
+            CashShift.closed_at < end_dt,
+        )
+        .first()
+    )
+
+    # 1. Sumamos lo que ya entró directamente en Dólares
+    dolares_directos = (totals.total_usd or 0) + (totals.total_zelle or 0)
+
+    # 2. Sumamos todos los métodos que entraron en Bolívares
+    bolivares_totales = (
+        (totals.total_bs or 0)
+        + (totals.total_pagomovil or 0)
+        + (totals.total_biopago or 0)
+        + (totals.total_punto or 0)
+    )
+
+    # 3. Calculamos el Gran Total convirtiendo los Bs a tasa BCV
+    # Evitamos división por cero por si acaso
+    total_convertido = dolares_directos + (
+        bolivares_totales / (tasa_bcv if tasa_bcv > 0 else 1)
+    )
+
+    return jsonify(
+        {
+            "period": {"start": start_date, "end": end_date},
+            "totals": {
+                "usd_cash": float(totals.total_usd or 0),
+                "bs_cash": float(totals.total_bs or 0),
+                "zelle": float(totals.total_zelle or 0),
+                "pagomovil": float(totals.total_pagomovil or 0),
+                "biopago": float(totals.total_biopago or 0),
+                "punto": float(totals.total_punto or 0),
+            },
+            "total_shifts": totals.count_shifts,
+            "grand_total_usd": round(
+                total_convertido, 2
+            ),  # Aquí está la magia del recalculo
+            "tasa_utilizada": tasa_bcv,
+        }
+    ), 200
+
+
+@api.route("/admin/exchange-rate", methods=["POST"])
+@jwt_required()
+def set_exchange_rate():
+    body = request.get_json()
+    rate_value = body.get("rate")
+    date_str = body.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
+    date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+
+    if not rate_value:
+        return jsonify({"msg": "La tasa es obligatoria"}), 400
+
+    # Si ya existe una tasa para hoy, la actualizamos. Si no, la creamos.
+    existing_rate = ExchangeRate.query.filter_by(date=date_obj).first()
+
+    if existing_rate:
+        existing_rate.rate = rate_value
+    else:
+        new_rate = ExchangeRate(rate=rate_value, date=date_obj)
+        db.session.add(new_rate)
+
+    db.session.commit()
+    return jsonify({"msg": "Tasa de cambio actualizada correctamente"}), 200
+
+
+@api.route("/admin/get-rate", methods=["GET"])
+@jwt_required()
+def get_exchange_rate():
+    date_str = request.args.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
+    date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+
+    rate_obj = ExchangeRate.query.filter_by(date=date_obj).first()
+
+    if rate_obj:
+        return jsonify(rate_obj.serialize()), 200
+
+    return jsonify({"rate": 36.50}), 404  # Valor por defecto si no hay registro
