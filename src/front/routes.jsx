@@ -10,6 +10,7 @@ import { SignUp } from "./pages/SignUp";
 import { Dashboard } from "./pages/Dashboard"; // Asumiendo que tienes esta página
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { CashierPanel } from "./pages/CashierPanel";
+import { CompanyDetail } from "./components/CompanyDetail";
 
 export const router = createBrowserRouter(
   createRoutesFromElements(
@@ -20,12 +21,22 @@ export const router = createBrowserRouter(
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<SignUp />} />
 
-      {/* Ruta para el Dueño/Admin */}
+      {/* Rutas para el Dueño/Admin */}
       <Route
         path="/dashboard"
         element={
           <ProtectedRoute roleRequired="admin">
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* 2. NUEVA RUTA: Detalle de Sede */}
+      <Route
+        path="/dashboard/company/:id"
+        element={
+          <ProtectedRoute roleRequired="admin">
+            <CompanyDetail />
           </ProtectedRoute>
         }
       />

@@ -396,26 +396,23 @@ export const Dashboard = () => {
                         {companies.map((company) => (
                             <div key={company.id} className="relative group">
                                 <div
-                                    onClick={() => setSelectedCompany(company)}
-                                    className={`p-8 rounded-[2rem] border-2 cursor-pointer transition-all duration-300 ${selectedCompany?.id === company.id
-                                        ? "border-green-500 bg-green-50 shadow-xl shadow-green-900/5 -translate-y-1"
-                                        : "border-slate-100 bg-white hover:border-slate-300 shadow-sm hover:shadow-md"
-                                        }`}
+                                    onClick={() => navigate(`/dashboard/company/${company.id}`)} // <--- CAMBIO AQUÍ
+                                    className="p-8 rounded-[2rem] border-2 cursor-pointer transition-all duration-300 border-slate-100 bg-white hover:border-green-400 hover:shadow-xl hover:shadow-green-900/5 -translate-y-1 group"
                                 >
                                     <div className="flex items-center justify-between">
-                                        <div className={`p-3 rounded-2xl ${selectedCompany?.id === company.id ? 'bg-green-600 text-white' : 'bg-slate-50 text-slate-400'}`}>
+                                        <div className="p-3 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-green-600 group-hover:text-white transition-colors">
                                             <Building2 size={24} />
                                         </div>
-                                        {selectedCompany?.id === company.id && (
-                                            <span className="text-[10px] bg-green-600 text-white px-3 py-1 rounded-full font-black uppercase tracking-tighter">
-                                                Seleccionada
-                                            </span>
-                                        )}
+                                        {/* Badge de "Ver Detalle" que aparece al pasar el mouse */}
+                                        <span className="opacity-0 group-hover:opacity-100 text-[10px] bg-green-600 text-white px-3 py-1 rounded-full font-black uppercase tracking-tighter transition-opacity">
+                                            Analizar Sede
+                                        </span>
                                     </div>
-                                    <h4 className="mt-6 font-black text-slate-900 text-xl">{company.name}</h4>
+                                    <h4 className="mt-6 font-black text-slate-900 text-xl group-hover:text-green-700 transition-colors">{company.name}</h4>
                                     <p className="text-slate-500 text-sm mt-1">{company.address || "Boconó, Venezuela"}</p>
                                 </div>
 
+                                {/* Botón de eliminar (se mantiene igual) */}
                                 <button
                                     onClick={(e) => { e.stopPropagation(); handleDeleteCompany(company.id, company.name); }}
                                     className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
