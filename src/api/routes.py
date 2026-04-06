@@ -4,7 +4,7 @@ from api.utils import generate_sitemap, APIException
 from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
 from werkzeug.security import generate_password_hash
-from sqlalchemy import func
+from sqlalchemy import func, text
 from datetime import datetime, timedelta
 
 api = Blueprint("api", __name__)
@@ -41,6 +41,40 @@ def handle_signup():
         db.session.rollback()
         print(f"Error detallado: {str(e)}")
         return jsonify({"msg": "Error interno al crear la cuenta"}), 500
+
+
+@api.route("/cashier", methods=["POST"])
+@jwt_required()  # Solo tú (Admin) puedes crear cajeros
+def create_cashier():
+    body = request.get_json()
+
+    # Validamos que lleguen los datos que envías desde el front
+    if not body.get("email") or not body.get("password") or not body.get("company_id"):
+        return jsonify({"msg": "Faltan datos: email, password o sede"}), 400
+
+    try:
+        # Obtenemos tu ID de organización desde el token JWT
+        current_user_id = get_jwt_identity()
+        admin = User.query.get(current_user_id)
+
+        new_cashier = User(
+            full_name=body.get("full_name"),
+            email=body.get("email"),
+            password=generate_password_hash(
+                body.get("password")
+            ),  # ¡Siempre encriptada!
+            role="cashier",
+            company_id=body.get("company_id"),
+            organization_id=admin.organization_id,  # Se hereda de tu cuenta
+        )
+
+        db.session.add(new_cashier)
+        db.session.commit()
+        return jsonify({"msg": "Cajero vinculado con éxito"}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"msg": f"Error: {str(e)}"}), 500
 
 
 @api.route("/login", methods=["POST"])
@@ -91,33 +125,6 @@ def get_user_companies():
     # Serializamos la lista
     results = [company.serialize() for company in companies]
     return jsonify(results), 200
-
-
-@api.route("/cashier", methods=["POST"])
-@jwt_required()
-def create_cashier():
-    admin_id = get_jwt_identity()
-    admin = User.query.get(admin_id)
-    body = request.get_json()
-
-    # Verificamos que solo el admin pueda crear cajeros
-    if admin.role != "admin":
-        return jsonify({"msg": "No tienes permisos"}), 403
-
-    # Creamos el nuevo usuario con rol de cajero
-    new_cashier = User(
-        full_name=body["full_name"],
-        email=body["email"],
-        password=generate_password_hash(body["password"]),  # ¡Seguridad ante todo!
-        role="cajero",
-        organization_id=admin.organization_id,
-        company_id=body["company_id"],  # La sede a la que pertenece
-    )
-
-    db.session.add(new_cashier)
-    db.session.commit()
-
-    return jsonify({"msg": "Cajero registrado exitosamente"}), 201
 
 
 @api.route("/company/<int:company_id>/cashiers", methods=["GET"])
@@ -339,3 +346,111 @@ def get_exchange_rate():
         return jsonify(rate_obj.serialize()), 200
 
     return jsonify({"rate": 36.50}), 404  # Valor por defecto si no hay registro
+
+
+# nombre de la empresa en la ficha del detalle
+
+
+@api.route("/company/<int:company_id>", methods=["GET"])
+@jwt_required()
+def get_single_company(company_id):
+    # Buscamos la empresa en la DB
+    company = Company.query.get(company_id)
+
+    if not company:
+        return jsonify({"msg": "Sede no encontrada"}), 404
+
+    return jsonify(company.serialize()), 200
+
+
+# Endpoint para procesar datos de las estadisticas en el card de cada empresa
+@api.route("/admin/company-stats/<int:company_id>", methods=["GET"])
+@jwt_required()
+def get_company_stats(company_id):
+    # 1. Buscamos la tasa más reciente para cálculos (o la enviamos por query)
+    rate_obj = ExchangeRate.query.order_by(ExchangeRate.date.desc()).first()
+    tasa = rate_obj.rate if rate_obj else 36.50
+
+    # 2. Sumamos todo el histórico de esa sede
+    stats = (
+        db.session.query(
+            func.sum(CashShift.close_cash_usd).label("usd"),
+            func.sum(CashShift.close_zelle).label("zelle"),
+            func.sum(CashShift.close_cash_bs).label("bs"),
+            func.sum(CashShift.close_punto).label("punto"),
+            func.sum(CashShift.close_pagomovil).label("pago_movil"),
+            func.sum(CashShift.close_biopago).label("biopago"),
+            func.count(CashShift.id).label("total_turnos"),
+        )
+        .filter(CashShift.company_id == company_id, CashShift.status == "closed")
+        .first()
+    )
+
+    # Cálculo matemático de conversión
+    usd_directo = (stats.usd or 0) + (stats.zelle or 0)
+    bs_a_convertir = (
+        (stats.bs or 0)
+        + (stats.punto or 0)
+        + (stats.pago_movil or 0)
+        + (stats.biopago or 0)
+    )
+    total_usd_historico = usd_directo + (bs_a_convertir / tasa)
+
+    # 3. Ranking de Cajeros (Corregido: cashier_id)
+    cajeros_ranking = (
+        db.session.query(
+            User.full_name, func.count(CashShift.id).label("turnos_hechos")
+        )
+        # Cambiamos CashShift.user_id por CashShift.cashier_id
+        .join(CashShift, CashShift.cashier_id == User.id)
+        .filter(CashShift.company_id == company_id)
+        .group_by(User.full_name)
+        .order_by(text("turnos_hechos DESC"))
+        .all()
+    )
+
+    return jsonify(
+        {
+            "total_ventas_usd": round(total_usd_historico, 2),
+            "total_turnos": stats.total_turnos or 0,
+            "ticket_promedio": round(total_usd_historico / stats.total_turnos, 2)
+            if stats.total_turnos and stats.total_turnos > 0
+            else 0,
+            "ranking": [{"name": r[0], "count": r[1]} for r in cajeros_ranking],
+        }
+    ), 200
+
+
+# endpoints de las graficas
+
+
+@api.route("/admin/company-trends/<int:company_id>", methods=["GET"])
+@jwt_required()
+def get_company_trends(company_id):
+    # 1. Definimos el rango: hoy y hace 7 días
+    today = datetime.now()
+    seven_days_ago = today - timedelta(days=7)
+
+    # 2. Consultamos los turnos cerrados en ese rango
+    shifts = (
+        CashShift.query.filter(
+            CashShift.company_id == company_id,
+            CashShift.status == "closed",
+            CashShift.closed_at >= seven_days_ago,
+        )
+        .order_by(CashShift.closed_at.asc())
+        .all()
+    )
+
+    # 3. Formateamos los datos para la gráfica
+    # Recharts espera un formato: [{"name": "01/04", "total": 120}, ...]
+    trend_data = []
+    for s in shifts:
+        # CAMBIO AQUÍ: Usar s.closed_at en lugar de s.total_at
+        fecha_formateada = s.closed_at.strftime("%d/%m") if s.closed_at else "S/F"
+
+        total_turno = (s.close_cash_usd or 0) + (s.close_zelle or 0)
+
+        trend_data.append({"fecha": fecha_formateada, "ventas": round(total_turno, 2)})
+
+    return jsonify(trend_data), 200

@@ -143,11 +143,18 @@ export const Dashboard = () => {
     };
 
     const handleAddCashier = async () => {
-        if (!selectedCompany) return alert("Por favor, selecciona una sede primero.");
+        // Si no hay sede seleccionada, le pedimos el ID directamente por ahora
+        let companyId = selectedCompany?.id;
 
-        const name = prompt(`Nombre del cajero para ${selectedCompany.name}:`);
-        const email = prompt("Correo electrónico del cajero:");
-        const pass = prompt("Asigna una contraseña temporal:");
+        if (!companyId) {
+            const inputId = prompt("No has seleccionado sede. Introduce el ID de la sede (1 para Panko, 2 para Kreativa):");
+            if (!inputId) return;
+            companyId = inputId;
+        }
+
+        const name = prompt(`Nombre del nuevo cajero:`);
+        const email = prompt("Correo electrónico:");
+        const pass = prompt("Contraseña temporal:");
 
         if (!name || !email || !pass) return;
 
@@ -162,14 +169,14 @@ export const Dashboard = () => {
                     full_name: name,
                     email: email,
                     password: pass,
-                    company_id: selectedCompany.id
+                    company_id: companyId // Usamos el ID determinado
                 })
             });
 
-            if (response.ok) alert("Cajero registrado y vinculado a la sede.");
-            else alert("Error al registrar cajero. Revisa si el correo ya existe.");
+            if (response.ok) alert("¡Listo! Cajero asignado.");
+            else alert("Error: Verifica si el correo ya existe o el ID de sede es correcto.");
         } catch (error) {
-            console.error("Error:", error);
+            console.error("Error en la conexión:", error);
         }
     };
 
@@ -254,11 +261,11 @@ export const Dashboard = () => {
 
             {/* SIDEBAR VERTICAL */}
             <aside className={`w-64 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 z-40
-                transition-transform duration-300 ease-in-out
-                ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
-                absolute md:relative inset-y-0 left-0 md:translate-x-0 
-                h-full md:min-h-screen`
-            }>
+    transition-transform duration-300 ease-in-out
+    ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
+    fixed md:sticky top-0 left-0 md:translate-x-0 
+    h-screen shadow-xl`}
+            >
                 <div className="hidden md:block p-6">
                     <h1 className="text-2xl font-black text-white italic">Cortex<span className="text-green-500">App</span></h1>
                 </div>
@@ -266,7 +273,7 @@ export const Dashboard = () => {
                 <nav className="flex-1 px-4 mt-8 md:mt-0 space-y-2 overflow-y-auto">
                     <NavItem icon={<LayoutDashboard size={20} />} label="Resumen" active />
                     <NavItem icon={<Building2 size={20} />} label="Sub-Empresas" onClick={handleCreateCompany} />
-                    <NavItem icon={<Users size={20} />} label="Cajeros" onClick={() => { handleCreateCompany() }} />
+                    <NavItem icon={<Users size={20} />} label="Cajeros" onClick={() => { handleAddCashier() }} />
                     <NavItem icon={<ReceiptIndianRupee size={20} />} label="Cortes de Caja" />
                     <div className="pt-4 mt-4 border-t border-slate-800">
                         <NavItem icon={<Settings size={20} />} label="Configuración" />
@@ -396,20 +403,43 @@ export const Dashboard = () => {
                         {companies.map((company) => (
                             <div key={company.id} className="relative group">
                                 <div
-                                    onClick={() => navigate(`/dashboard/company/${company.id}`)} // <--- CAMBIO AQUÍ
-                                    className="p-8 rounded-[2rem] border-2 cursor-pointer transition-all duration-300 border-slate-100 bg-white hover:border-green-400 hover:shadow-xl hover:shadow-green-900/5 -translate-y-1 group"
+                                    // CAMBIO 1: Ahora el clic en la tarjeta SOLO selecciona la sede para el cajero
+                                    onClick={() => setSelectedCompany(company)}
+                                    className={`p-8 rounded-[2rem] border-2 cursor-pointer transition-all duration-300 -translate-y-1 group 
+                ${selectedCompany?.id === company.id
+                                            ? 'border-green-500 bg-green-50 shadow-lg shadow-green-900/5'
+                                            : 'border-slate-100 bg-white hover:border-slate-300'}`}
                                 >
                                     <div className="flex items-center justify-between">
-                                        <div className="p-3 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-green-600 group-hover:text-white transition-colors">
+                                        <div className={`p-3 rounded-2xl transition-colors ${selectedCompany?.id === company.id ? 'bg-green-600 text-white' : 'bg-slate-50 text-slate-400'
+                                            }`}>
                                             <Building2 size={24} />
                                         </div>
-                                        {/* Badge de "Ver Detalle" que aparece al pasar el mouse */}
-                                        <span className="opacity-0 group-hover:opacity-100 text-[10px] bg-green-600 text-white px-3 py-1 rounded-full font-black uppercase tracking-tighter transition-opacity">
+
+                                        {/* CAMBIO 2: Este botón ahora maneja la navegación de forma aislada */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // CRITICO: Evita que se seleccione la sede al querer ir al detalle
+                                                navigate(`/dashboard/company/${company.id}`);
+                                            }}
+                                            className="opacity-0 group-hover:opacity-100 text-[10px] bg-slate-900 text-white px-4 py-2 rounded-full font-black uppercase tracking-widest transition-all hover:bg-green-600 hover:scale-105"
+                                        >
                                             Analizar Sede
-                                        </span>
+                                        </button>
                                     </div>
-                                    <h4 className="mt-6 font-black text-slate-900 text-xl group-hover:text-green-700 transition-colors">{company.name}</h4>
-                                    <p className="text-slate-500 text-sm mt-1">{company.address || "Boconó, Venezuela"}</p>
+
+                                    <h4 className="mt-6 font-black text-slate-900 text-xl">{company.name}</h4>
+                                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">
+                                        {company.address || "Boconó, Venezuela"}
+                                    </p>
+
+                                    {/* Indicador visual de selección para el usuario */}
+                                    {selectedCompany?.id === company.id && (
+                                        <div className="mt-4 flex items-center gap-2 text-green-600 animate-pulse">
+                                            <div className="w-2 h-2 rounded-full bg-green-600"></div>
+                                            <span className="text-[10px] font-black uppercase tracking-tighter">Sede Seleccionada para Cajero</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Botón de eliminar (se mantiene igual) */}
