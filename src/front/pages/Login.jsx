@@ -25,26 +25,27 @@ export const Login = () => {
             const response = await fetch(`${baseUrl}/api/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData) // formData debe tener email y password
+                body: JSON.stringify(formData)
             });
 
             const data = await response.json();
 
             if (response.ok) {
+                localStorage.setItem("token", data.token || data.access_token);
 
-                localStorage.setItem("token", data.token);
                 dispatch({
                     type: "login_user",
                     payload: data.user
                 });
-                if (data.user.role === "admin") {
+
+                // Redirección limpia por roles
+                if (data.user.role === "master") {
                     navigate("/dashboard");
-                } else if (data.user.role === "cajero") {
+                } else if (data.user.role === "cashier") {
                     navigate("/pos");
                 }
-
             } else {
-                alert(data.msg);
+                alert(data.msg || "Error en el login");
             }
         } catch (error) {
             console.error("Error en el login:", error);

@@ -17,30 +17,53 @@ CORS(api)
 def handle_signup():
     body = request.get_json()
 
-    if not body or "email" not in body or "organizationName" not in body:
-        return jsonify({"msg": "Faltan campos obligatorios"}), 400
-
     try:
+        # Encriptar contraseña
+        hashed_password = generate_password_hash(body["password"])
+
+        # Crear organización
         new_org = Organization(name=body["organizationName"])
         db.session.add(new_org)
         db.session.flush()
 
+        # Crear usuario con rol master
         new_user = User(
             full_name=body["fullName"],
             email=body["email"],
-            password=body["password"],
+            password=hashed_password,
             organization_id=new_org.id,
-            role="master",
+            role="master",  # Rol principal corregido
         )
         db.session.add(new_user)
         db.session.commit()
 
-        return jsonify({"msg": "Registro exitoso", "user": new_user.serialize()}), 201
+        return jsonify({"msg": "Registro exitoso"}), 201
 
     except Exception as e:
         db.session.rollback()
         print(f"Error detallado: {str(e)}")
         return jsonify({"msg": "Error interno al crear la cuenta"}), 500
+
+
+@api.route("/profile", methods=["GET"])
+@jwt_required()
+def get_profile():
+    # El identity suele ser el ID del usuario que guardaste al crear el token
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+
+    if not user:
+        return jsonify({"msg": "Usuario no encontrado"}), 404
+
+    return jsonify(
+        {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role,
+            "organization_id": user.organization_id,
+        }
+    ), 200
 
 
 @api.route("/cashier", methods=["POST"])
@@ -130,11 +153,19 @@ def get_user_companies():
 @api.route("/company/<int:company_id>/cashiers", methods=["GET"])
 @jwt_required()
 def get_company_cashiers(company_id):
+    # 1. Obtenemos la identidad del admin (opcional, pero sirve para validar)
     admin_id = get_jwt_identity()
-    # Buscamos solo los usuarios con rol cajero que pertenecen a esa sede
-    cashiers = User.query.filter_by(company_id=company_id, role="cajero").all()
 
+    # 2. CORRECCIÓN: Cambiar "cajero" por "cashier"
+    # Asegúrate de que en tu base de datos el rol se guarde como "cashier"
+    cashiers = User.query.filter_by(company_id=company_id, role="cashier").all()
+
+    # 3. Serializamos y enviamos
     results = [cashier.serialize() for cashier in cashiers]
+
+    # Debug opcional: imprime en consola para ver qué está pasando
+    print(f"Buscando cajeros para sede {company_id}. Encontrados: {len(results)}")
+
     return jsonify(results), 200
 
 

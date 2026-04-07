@@ -64,7 +64,9 @@ class Company(db.Model):
     organization_id = db.Column(
         db.Integer, db.ForeignKey("organization.id"), nullable=False
     )
-    cashiers = db.relationship("User", backref="company", lazy=True)
+    cashiers = db.relationship(
+        "User", backref="company", lazy=True, cascade="all, delete-orphan"
+    )
 
     def serialize(self):
         return {"id": self.id, "name": self.name, "address": self.address}

@@ -5,8 +5,18 @@ import {
     Settings, LogOut, UserCircle, Menu, X, Calendar, DollarSign, ClipboardCheck, AlertCircle
 } from 'lucide-react';
 import useGlobalReducer from "../hooks/useGlobalReducer";
+import { CustomModal } from "../components/CustomModal";
 
 export const Dashboard = () => {
+    // Estados para el Modal
+    const [modalConfig, setModalConfig] = useState({
+        isOpen: false,
+        type: null, // 'SEDE' o 'EMPRESA'
+        title: ""
+    });
+
+    // Función para cerrar el modal limpiamente
+    const closeModal = () => setModalConfig({ ...modalConfig, isOpen: false });
     const { store } = useGlobalReducer();
     const navigate = useNavigate();
 
@@ -91,7 +101,18 @@ export const Dashboard = () => {
     };
 
     const handleDeleteCompany = async (id, name) => {
-        if (!confirm(`¿Estás seguro de eliminar la sede "${name}"? Esto borrará también sus registros.`)) return;
+        // 1. Contamos cuántos cajeros pertenecen a esta sede específica
+        const relatedCashiers = cashiers.filter(c => c.company_id === id);
+        const count = relatedCashiers.length;
+
+        // 2. Personalizamos el mensaje según si hay personal o no
+        let message = `¿Estás seguro de eliminar la sede "${name}"?`;
+
+        if (count > 0) {
+            message = `¡ADVERTENCIA! La sede "${name}" tiene ${count} cajero(s) registrado(s). \n\nSi la eliminas, estos usuarios también serán eliminados permanentemente del sistema. \n\n¿Deseas continuar?`;
+        }
+
+        if (!confirm(message)) return;
 
         try {
             const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/company/${id}`, {
@@ -100,9 +121,11 @@ export const Dashboard = () => {
             });
 
             if (response.ok) {
-                alert("Sede eliminada");
-                fetchCompanies(); // Refrescamos la lista
+                alert("Sede y personal asociado eliminados con éxito.");
+                fetchCompanies(); // Refrescamos las tarjetas de sedes
                 if (selectedCompany?.id === id) setSelectedCompany(null);
+            } else {
+                alert("Error al intentar eliminar la sede.");
             }
         } catch (error) {
             console.error("Error eliminando sede:", error);
@@ -113,8 +136,15 @@ export const Dashboard = () => {
         setIsSidebarOpen(!isSidebarOpen);
     };
 
-    const handleCreateCompany = async () => {
-        const companyName = prompt("Nombre de la nueva sede (ej: Pizzería Centro):");
+    const openCreateCompanyModal = () => {
+        setModalConfig({
+            isOpen: true,
+            type: 'EMPRESA',
+            title: "Nueva Sub-Empresa"
+        });
+    };
+
+    const handleCreateCompany = async (companyName) => {
         if (!companyName) return;
 
         const token = localStorage.getItem("token");
@@ -133,7 +163,7 @@ export const Dashboard = () => {
             if (response.ok) {
                 alert("¡Sede creada con éxito!");
                 fetchCompanies()
-                // Aquí podrías disparar una función para refrescar la lista
+                closeModal()
             } else {
                 alert("Error al crear la sede");
             }
@@ -142,21 +172,23 @@ export const Dashboard = () => {
         }
     };
 
-    const handleAddCashier = async () => {
-        // Si no hay sede seleccionada, le pedimos el ID directamente por ahora
-        let companyId = selectedCompany?.id;
+    const openAddCashierModal = () => {
+        setModalConfig({
+            isOpen: true,
+            type: 'CAJIERO',
+            title: "Registrar Nuevo Cajero"
+        });
+    };
+
+    const handleAddCashier = async (newData) => {
+        // La sede la tomamos del estado selectedCompany que ya tienes en el Dashboard
+        const companyId = selectedCompany?.id;
 
         if (!companyId) {
-            const inputId = prompt("No has seleccionado sede. Introduce el ID de la sede (1 para Panko, 2 para Kreativa):");
-            if (!inputId) return;
-            companyId = inputId;
+            alert("Por favor, selecciona una sede primero en el panel de abajo.");
+            closeModal();
+            return;
         }
-
-        const name = prompt(`Nombre del nuevo cajero:`);
-        const email = prompt("Correo electrónico:");
-        const pass = prompt("Contraseña temporal:");
-
-        if (!name || !email || !pass) return;
 
         try {
             const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/cashier`, {
@@ -166,32 +198,45 @@ export const Dashboard = () => {
                     "Authorization": `Bearer ${localStorage.getItem("token")}`
                 },
                 body: JSON.stringify({
-                    full_name: name,
-                    email: email,
-                    password: pass,
-                    company_id: companyId // Usamos el ID determinado
+                    full_name: newData.name,
+                    email: newData.email,
+                    password: newData.password,
+                    company_id: companyId
                 })
             });
 
-            if (response.ok) alert("¡Listo! Cajero asignado.");
-            else alert("Error: Verifica si el correo ya existe o el ID de sede es correcto.");
+            if (response.ok) {
+                alert("Cajero registrado con éxito.");
+                fetchCashiers(); // Refresca la lista
+                closeModal();    // Cierra el modal
+            } else {
+                alert("Error: El correo ya existe o faltan datos.");
+            }
         } catch (error) {
             console.error("Error en la conexión:", error);
         }
     };
 
-    const fetchCashiers = async (companyId) => {
-        const token = localStorage.getItem("token");
+    const fetchCashiers = async () => {
+        if (!selectedCompany?.id) return;
+
         try {
-            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/company/${companyId}/cashiers`, {
-                headers: { "Authorization": `Bearer ${token}` }
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/company/${selectedCompany.id}/cashiers`, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${localStorage.getItem("token")}` // <--- Vital para evitar el 401
+                }
             });
+
             if (response.ok) {
                 const data = await response.json();
-                setCashiers(data);
+                setCashiers(data); // <--- Guardamos solo los cajeros de ESTA sede
+            } else {
+                setCashiers([]); // Si hay error, limpiamos la lista para no mostrar datos viejos
             }
         } catch (error) {
-            console.error("Error cargando cajeros:", error);
+            console.error("Error en la línea de producción de datos:", error);
         }
     };
 
@@ -233,18 +278,17 @@ export const Dashboard = () => {
         fetchCompanies();
     }, []); // Se ejecuta una sola vez al montar el componente
 
-    // Efecto 2: Cargar cajeros cuando se selecciona una empresa
-    useEffect(() => {
-        if (selectedCompany) {
-            fetchCashiers(selectedCompany.id);
-        }
-    }, [selectedCompany]);
-
     useEffect(() => { fetchAuditData(); }, [dateFilter]);
 
     useEffect(() => {
         fetchTodayRate();
     }, [dateFilter]);
+
+    useEffect(() => {
+        if (selectedCompany?.id) {
+            fetchCashiers(); // <--- Solo busca si hay una sede marcada
+        }
+    }, [selectedCompany]);
 
     return (
         <div className="flex flex-col md:flex-row min-h-screen bg-slate-50">
@@ -272,9 +316,18 @@ export const Dashboard = () => {
 
                 <nav className="flex-1 px-4 mt-8 md:mt-0 space-y-2 overflow-y-auto">
                     <NavItem icon={<LayoutDashboard size={20} />} label="Resumen" active />
-                    <NavItem icon={<Building2 size={20} />} label="Sub-Empresas" onClick={handleCreateCompany} />
-                    <NavItem icon={<Users size={20} />} label="Cajeros" onClick={() => { handleAddCashier() }} />
-                    <NavItem icon={<ReceiptIndianRupee size={20} />} label="Cortes de Caja" />
+                    <NavItem
+                        icon={<Building2 size={20} />}
+                        label="Sub-Empresas"
+                        onClick={openCreateCompanyModal}
+                    />
+                    <NavItem
+                        icon={<Users size={20} />}
+                        label="Cajeros"
+                        onClick={openAddCashierModal}
+                    />
+                    {/* usaremos luego este boton */}
+                    {/* <NavItem icon={<ReceiptIndianRupee size={20} />} label="Cortes de Caja" /> */}
                     <div className="pt-4 mt-4 border-t border-slate-800">
                         <NavItem icon={<Settings size={20} />} label="Configuración" />
                     </div>
@@ -422,7 +475,7 @@ export const Dashboard = () => {
                                                 e.stopPropagation(); // CRITICO: Evita que se seleccione la sede al querer ir al detalle
                                                 navigate(`/dashboard/company/${company.id}`);
                                             }}
-                                            className="opacity-0 group-hover:opacity-100 text-[10px] bg-slate-900 text-white px-4 py-2 rounded-full font-black uppercase tracking-widest transition-all hover:bg-green-600 hover:scale-105"
+                                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 text-[10px] bg-slate-900 text-white px-4 py-2 rounded-full font-black uppercase tracking-widest transition-all hover:bg-green-600 active:scale-95"
                                         >
                                             Analizar Sede
                                         </button>
@@ -453,7 +506,7 @@ export const Dashboard = () => {
                         ))}
 
                         <button
-                            onClick={handleCreateCompany}
+                            onClick={openAddCashierModal}
                             className="flex flex-col items-center justify-center p-8 rounded-[2rem] border-2 border-dashed border-slate-200 bg-slate-50 text-slate-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50/50 transition-all group"
                         >
                             <div className="p-4 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
@@ -519,15 +572,103 @@ export const Dashboard = () => {
                     </div>
                 )}
             </main>
+            {/* MODAL GLOBAL REUTILIZABLE */}
+            <CustomModal
+                isOpen={modalConfig.isOpen}
+                onClose={closeModal}
+                title={modalConfig.title}
+            >
+                {modalConfig.type === 'EMPRESA' && (
+                    <div className="space-y-4">
+                        <input
+                            id="newCompanyName"
+                            type="text"
+                            placeholder="Nombre de la sede (ej: Panko)"
+                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-green-500 text-slate-900"
+                        />
+                        <button
+                            onClick={() => {
+                                const name = document.getElementById('newCompanyName').value;
+                                handleCreateCompany(name);
+                            }}
+                            className="w-full py-4 bg-green-600 text-white font-black rounded-xl hover:bg-green-500 transition-all"
+                        >
+                            CREAR SEDE
+                        </button>
+                    </div>
+                )}
+                {/* NUEVO CASO: Formulario de Cajero */}
+                {modalConfig.type === 'CAJIERO' && (
+                    <div className="space-y-4">
+                        {/* SELECTOR DE SEDE DINÁMICO */}
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">
+                                Ubicación de Destino:
+                            </label>
+                            {selectedCompany ? (
+                                <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex justify-between items-center">
+                                    <span className="font-bold text-green-700 text-sm">{selectedCompany.name}</span>
+                                    <button
+                                        onClick={() => setSelectedCompany(null)}
+                                        className="text-[10px] bg-green-200 text-green-800 px-2 py-1 rounded-lg hover:bg-green-300"
+                                    >
+                                        Cambiar
+                                    </button>
+                                </div>
+                            ) : (
+                                <select
+                                    id="cajeroSedeId"
+                                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-green-500 text-slate-900 font-medium"
+                                    onChange={(e) => {
+                                        const sede = companies.find(c => c.id === parseInt(e.target.value));
+                                        setSelectedCompany(sede);
+                                    }}
+                                >
+                                    <option value="">Selecciona una sede...</option>
+                                    {companies.map(company => (
+                                        <option key={company.id} value={company.id}>{company.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+
+                        {/* INPUTS DE DATOS */}
+                        <input id="cajeroName" type="text" placeholder="Nombre Completo" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-green-500 text-slate-900" />
+                        <input id="cajeroEmail" type="email" placeholder="Correo Electrónico" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-green-500 text-slate-900" />
+                        <input id="cajeroPass" type="password" placeholder="Contraseña Temporal" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-green-500 text-slate-900" />
+
+                        <button
+                            onClick={() => {
+                                const name = document.getElementById('cajeroName').value;
+                                const email = document.getElementById('cajeroEmail').value;
+                                const password = document.getElementById('cajeroPass').value;
+                                // El ID lo tomamos del select o del estado previo
+                                const companyId = selectedCompany?.id || document.getElementById('cajeroSedeId')?.value;
+
+                                if (name && email && password && companyId) {
+                                    handleAddCashier({ name, email, password, companyId });
+                                } else {
+                                    alert("Faltan datos o no has seleccionado una sede");
+                                }
+                            }}
+                            className="w-full py-4 bg-slate-900 text-white font-black rounded-xl hover:bg-slate-800 transition-all mt-2"
+                        >
+                            REGISTRAR CAJERO
+                        </button>
+                    </div>
+                )}
+            </CustomModal>
         </div>
     );
 };
 
 // Componentes internos (No necesitan cambios)
-const NavItem = ({ icon, label, active = false, onClick }) => ( // Añadimos onClick aquí
+const NavItem = ({ icon, label, active = false, onClick }) => (
     <div
-        onClick={onClick} // Se lo asignamos al div
-        className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all ${active ? 'bg-green-600 text-white shadow-lg shadow-green-900/20' : 'hover:bg-slate-800 hover:text-white'
+        onClick={onClick} // <-- ESTA LÍNEA ES VITAL
+        className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all ${active
+            ? 'bg-green-600 text-white shadow-lg shadow-green-900/20'
+            : 'hover:bg-slate-800 hover:text-white'
             }`}
     >
         {icon}

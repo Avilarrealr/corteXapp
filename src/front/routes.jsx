@@ -25,7 +25,7 @@ export const router = createBrowserRouter(
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute roleRequired="admin">
+          <ProtectedRoute roleRequired="master">
             <Dashboard />
           </ProtectedRoute>
         }
@@ -35,7 +35,7 @@ export const router = createBrowserRouter(
       <Route
         path="/dashboard/company/:id"
         element={
-          <ProtectedRoute roleRequired="admin">
+          <ProtectedRoute roleRequired="master">
             <CompanyDetail />
           </ProtectedRoute>
         }
@@ -45,7 +45,7 @@ export const router = createBrowserRouter(
       <Route
         path="/pos"
         element={
-          <ProtectedRoute roleRequired="cajero">
+          <ProtectedRoute roleRequired="cashier">
             <CashierPanel />
           </ProtectedRoute>
         }
