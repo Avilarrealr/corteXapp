@@ -10,6 +10,7 @@ flask-migrate
 flask-sqlalchemy
 flask-swagger
 gunicorn
+flask-jwt-extended
 itsdangerous
 jinja2
 mako
