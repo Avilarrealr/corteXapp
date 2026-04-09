@@ -66,7 +66,7 @@ export const Navbar = () => {
                             {authButtons.map((btn, index) => (
                                 <button
                                     key={index}
-                                    onClick={() => handleNavigation(btn.path)} // <--- FIX AQUÍ
+                                    onClick={() => handleNavigation(btn.path)}
                                     className={`w-full py-2 rounded-full font-medium ${btn.primary ? "bg-green-900 text-white" : "border text-green-900"}`}
                                 >
                                     {btn.name}

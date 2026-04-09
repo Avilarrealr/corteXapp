@@ -506,7 +506,7 @@ export const Dashboard = () => {
                         ))}
 
                         <button
-                            onClick={openAddCashierModal}
+                            onClick={openCreateCompanyModal}
                             className="flex flex-col items-center justify-center p-8 rounded-[2rem] border-2 border-dashed border-slate-200 bg-slate-50 text-slate-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50/50 transition-all group"
                         >
                             <div className="p-4 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
@@ -528,8 +528,9 @@ export const Dashboard = () => {
                                 </h3>
                             </div>
                             <button
-                                onClick={handleAddCashier}
+                                onClick={openAddCashierModal}
                                 className="w-full md:w-auto flex items-center justify-center gap-2 bg-green-500 text-slate-900 px-8 py-4 rounded-2xl font-black hover:bg-green-400 transition-all"
+                                type="submit"
                             >
                                 <Users size={20} /> REGISTRAR CAJERO
                             </button>

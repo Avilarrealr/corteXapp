@@ -2,8 +2,11 @@ import React from "react";
 import { Navbar } from "../components/Navbar";
 import { Calculator, ArrowUpRight } from 'lucide-react';
 import { FeaturesSection } from "../components/FeaturesSection";
+import { useNavigate } from "react-router-dom";
 
 export const Home = () => {
+	const navigate = useNavigate()
+
 	return (
 		<div>
 			<Navbar />
@@ -34,22 +37,12 @@ export const Home = () => {
 								Potencia tu operación con datos precisos.
 							</p>
 
-							{/* Formulario de Registro Rápido */}
-							<div className="flex flex-col sm:flex-row items-center p-1.5 bg-white border border-slate-200 rounded-2xl !sm:rounded-full shadow-sm max-w-md w-full focus-within:border-blue-400 transition-all gap-2 sm:gap-0">
-								{/* Input: Quitamos bordes y fondos para que use los del padre */}
-								<input
-									type="email"
-									placeholder="Tu correo empresarial"
-									className="w-full sm:flex-grow px-4 py-3 sm:py-0 bg-transparent outline-none text-slate-600 placeholder:text-slate-400 text-sm md:text-base"
-								/>
+							{/* Botón: Con padding y el icono de la flechita */}
+							<button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-green-800 text-white px-6 py-3 rounded-xl !sm:rounded-full font-bold hover:bg-green-950 transition-all whitespace-nowrap text-sm md:text-base"
+								onClick={() => { navigate("/login") }}>
+								Comienza ya! <ArrowUpRight size={20} />
+							</button>
 
-								{/* Botón: Con padding y el icono de la flechita */}
-								<button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-green-800 text-white px-6 py-3 rounded-xl !sm:rounded-full font-bold hover:bg-green-950 transition-all whitespace-nowrap text-sm md:text-base">
-									Get Started <ArrowUpRight size={20} />
-								</button>
-							</div>
-
-							{/* Logos de Confianza (Opcional) */}
 							{/* Logos etcnologias */}
 							<section className="mt-12 sm:px-6 mx-auto z-10 relative">
 

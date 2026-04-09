@@ -38,6 +38,10 @@ class User(db.Model):
         db.Integer, db.ForeignKey("organization.id"), nullable=False
     )
 
+    shifts = db.relationship(
+        "CashShift", backref="cashier", cascade="all, delete-orphan"
+    )
+
     def __repr__(self):
         return f"<User {self.email}>"
 
