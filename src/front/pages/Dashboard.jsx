@@ -435,13 +435,13 @@ export const Dashboard = () => {
                         <div className="h-1 w-8 bg-green-500 rounded-full"></div>
                         <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Flujo de Efectivo Detallado</h3>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
                         <MiniStat label="Efectivo $" value={summary.totals.usd_cash} color="text-green-600" bg="bg-green-50" />
-                        <MiniStat label="Efectivo Bs" value={summary.totals.bs_cash} color="text-blue-600" bg="bg-blue-50" />
+                        <MiniStat label="Efectivo Bs" symbol="Bs " value={summary.totals.bs_cash} color="text-blue-600" bg="bg-blue-50" />
                         <MiniStat label="Zelle" value={summary.totals.zelle} color="text-purple-600" bg="bg-purple-50" />
-                        <MiniStat label="Pago Móvil" value={summary.totals.pagomovil} color="text-orange-600" bg="bg-orange-50" />
-                        <MiniStat label="Biopago" value={summary.totals.biopago} color="text-teal-600" bg="bg-teal-50" />
-                        <MiniStat label="Punto" value={summary.totals.punto} color="text-yellow-600" bg="bg-yellow-50" />
+                        <MiniStat label="Pago Móvil" symbol="Bs " value={summary.totals.pagomovil} color="text-orange-600" bg="bg-orange-50" />
+                        <MiniStat label="Biopago" symbol="Bs " value={summary.totals.biopago} color="text-teal-600" bg="bg-teal-50" />
+                        <MiniStat label="Punto" symbol="Bs " value={summary.totals.punto} color="text-yellow-600" bg="bg-yellow-50" />
                     </div>
                 </section>
 
@@ -693,9 +693,21 @@ const StatCard = ({ title, value, icon, loading }) => (
     </div>
 );
 
-const MiniStat = ({ label, value, color, bg }) => (
-    <div className={`${bg} p-5 rounded-[1.5rem] border border-white transition-transform hover:scale-105`}>
-        <p className="text-slate-500 text-[9px] font-black uppercase tracking-widest mb-1">{label}</p>
-        <p className={`text-xl font-black ${color}`}>${value.toFixed(2)}</p>
-    </div>
-);
+const MiniStat = ({ label, value, color, bg, symbol = "$" }) => {
+    // Lógica para reducir la fuente si el número es muy largo
+    const isLong = value?.toString().length > 8;
+
+    return (
+        <div className={`${bg} p-4 md:p-6 rounded-3xl flex flex-col items-center justify-center text-center shadow-sm`}>
+            <span className="text-[10px] font-black uppercase tracking-tighter text-slate-400 mb-1 leading-tight">
+                {label}
+            </span>
+            <div className={`flex items-baseline gap-0.5 ${color} font-black`}>
+                <span className="text-xs opacity-80">{symbol}</span>
+                <span className={`${isLong ? "text-lg" : "text-xl"} md:text-2xl transition-all`}>
+                    {value?.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+            </div>
+        </div>
+    );
+};

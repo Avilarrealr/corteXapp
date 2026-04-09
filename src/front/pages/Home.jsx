@@ -3,9 +3,18 @@ import { Navbar } from "../components/Navbar";
 import { Calculator, ArrowUpRight } from 'lucide-react';
 import { FeaturesSection } from "../components/FeaturesSection";
 import { useNavigate } from "react-router-dom";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 
 export const Home = () => {
 	const navigate = useNavigate()
+	const data = [
+		{ month: 'Ene', valor: 400000 },
+		{ month: 'Feb', valor: 600000 },
+		{ month: 'Mar', valor: 900000 },
+		{ month: 'Abr', valor: 1100000 },
+		{ month: 'May', valor: 1400000 },
+		{ month: 'Jun', valor: 1876580 },
+	];
 
 	return (
 		<div>
@@ -80,16 +89,36 @@ export const Home = () => {
 							</section>
 						</div>
 
-						{/* Columna Derecha: Elemento Visual */}
-						<div className="hidden lg:block relative">
-							{/* Aquí puedes poner una imagen de tu app o un "Mockup" creado con CSS */}
-							<div className="bg-white p-4 rounded-3xl shadow-2xl border border-slate-100 relative z-10">
-								<div className="bg-slate-50 rounded-2xl h-80 flex items-center justify-center">
-									<span className="text-slate-300 font-medium italic">Visual de la App / Mapa</span>
+						{/* Columna Derecha: Elemento Visual - Mejorado */}
+						<div className="hidden lg:block relative w-full h-[550px] mt-10"> {/* h-[550px] para dar más espacio vertical */}
+
+							{/* Imagen Desktop (La base) - Nítida y limpia */}
+							<div className="absolute top-0 left-0 w-[125%] z-10 transition-transform hover:-translate-y-2 duration-500">
+								<div className="relative overflow-hidden rounded-2xl shadow-2xl border border-slate-100 bg-white">
+									<img
+										src="/desktopView.png"  // <--- Tu imagen de public
+										alt="Desktop Dashboard"
+										className="w-full object-top" // <--- Eliminado el mask-image
+									/>
 								</div>
 							</div>
-							{/* Adorno decorativo (como los círculos en tu captura) */}
-							<div className="absolute -top-10 -right-10 h-64 w-64 bg-blue-100 rounded-full blur-3xl opacity-50 -z-0"></div>
+
+							{/* Imagen Mobile (Superpuesta) - Pulida con marco de teléfono */}
+							<div className="absolute top-32 -right-24 w-[45%] z-20 transition-transform hover:scale-105 duration-500"> {/* w-[40%] un poco más grande */}
+								<div className="relative overflow-hidden rounded-[2.5rem] shadow-2xl border-slate-300"> {/* Marco más definido */}
+									<div className="relative overflow-hidden rounded-[2rem] bg-white">
+										<img
+											src="/mobileView.png"   // <--- Tu imagen de public
+											alt="Mobile View"
+											className="w-full h-auto object-top" // <--- Eliminado el mask-image
+										/>
+									</div>
+								</div>
+							</div>
+
+							{/* Adornos de fondo (Blur) - Suavizados */}
+							<div className="absolute -top-10 -right-10 h-64 w-64 bg-green-100 rounded-full blur-3xl opacity-30 -z-0"></div>
+							<div className="absolute bottom-20 left-10 h-48 w-48 bg-blue-100 rounded-full blur-3xl opacity-20 -z-0"></div>
 						</div>
 
 					</div>
@@ -106,10 +135,50 @@ export const Home = () => {
 						</p>
 					</div>
 
-					<div className="hidden lg:block bg-slate-50 rounded-3xl p-8 aspect-square border border-dashed border-slate-300">
+					<div className="">
 						{/* Aquí podrías colocar una imagen o un componente de gráfico */}
-						<div className="flex justify-center items-center">
-							<span className="text-slate-400">Espacio para Visualización de Datos</span>
+						{/* Columna Derecha del Home */}
+						<div className="hidden lg:block bg-white rounded-3xl p-6 shadow-inner border border-slate-100 flex flex-col">
+							<div className="mb-4">
+								<span className="text-xs font-bold text-slate-400 uppercase tracking-tight">Resumen de Flujo</span>
+								<h4 className="text-3xl font-black text-slate-900 leading-none">$1,876,580</h4>
+							</div>
+
+							<div className="h-64 w-full">
+								<ResponsiveContainer width="100%" height="100%">
+									<AreaChart data={data}>
+										<defs>
+											<linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
+												<stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.1} />
+												<stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+											</linearGradient>
+										</defs>
+										<XAxis
+											dataKey="month"
+											axisLine={false}
+											tickLine={false}
+											tick={{ fill: '#94a3b8', fontSize: 12 }}
+											dy={10}
+										/>
+										<Tooltip
+											contentStyle={{ borderRadius: '15px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+										/>
+										<Area
+											type="monotone"
+											dataKey="valor"
+											stroke="#0ea5e9"
+											strokeWidth={3}
+											fillOpacity={1}
+											fill="url(#colorVal)"
+										/>
+									</AreaChart>
+								</ResponsiveContainer>
+							</div>
+
+							<div className="mt-4 pt-4 border-t border-slate-50 flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase">
+								<span>6 Meses</span>
+								<span className="text-green-500">+24% Este mes</span>
+							</div>
 						</div>
 					</div>
 				</section>
