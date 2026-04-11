@@ -266,26 +266,35 @@ def get_active_shift():
 @api.route("/admin/audit-summary", methods=["GET"])
 @jwt_required()
 def get_audit_summary():
-    # Solo el admin debería acceder a esto
-    # (Asumiendo que guardas el rol en el token o lo verificas aquí)
+    # 1. Obtener el usuario desde el token JWT
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
 
-    # Parámetros de fecha (por defecto hoy)
+    # 2. Validar que sea Admin
+    if user.role != "admin":
+        return jsonify(
+            {"msg": "Acceso denegado. Se requieren permisos de administrador"}
+        ), 403
+
     start_date = request.args.get("start_date", datetime.utcnow().strftime("%Y-%m-%d"))
     end_date = request.args.get("end_date", datetime.utcnow().strftime("%Y-%m-%d"))
     tasa_frontend = request.args.get("tasa")
 
-    # Si el frontend la envía, la usamos. Si no, buscamos la de la DB.
+    # Búsqueda de tasa filtrada por organización
     if tasa_frontend:
         tasa_bcv = float(tasa_frontend)
     else:
-        rate_obj = ExchangeRate.query.filter_by(date=datetime.utcnow().date()).first()
+        # Buscamos la tasa que pertenece a su organización
+        rate_obj = ExchangeRate.query.filter_by(
+            date=datetime.utcnow().date(),
+            organization_id=user.organization_id,  # <--- Filtro de seguridad
+        ).first()
         tasa_bcv = rate_obj.rate if rate_obj else 36.50
 
-    # Convertir strings a objetos datetime para el filtro
     start_dt = datetime.strptime(start_date, "%Y-%m-%d")
     end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
 
-    # Consulta para sumar todos los métodos de turnos CERRADOS en ese rango
+    # 3. Consulta con FILTRO DE ORGANIZACIÓN
     totals = (
         db.session.query(
             func.sum(CashShift.close_cash_usd).label("total_usd"),
@@ -297,6 +306,7 @@ def get_audit_summary():
             func.count(CashShift.id).label("count_shifts"),
         )
         .filter(
+            CashShift.organization_id == user.organization_id,  # <--- SEGURIDAD CLAVE
             CashShift.status == "closed",
             CashShift.closed_at >= start_dt,
             CashShift.closed_at < end_dt,
@@ -304,10 +314,15 @@ def get_audit_summary():
         .first()
     )
 
-    # 1. Sumamos lo que ya entró directamente en Dólares
-    dolares_directos = (totals.total_usd or 0) + (totals.total_zelle or 0)
+    # ... (Resto de tu lógica de cálculo de dolares_directos y bolivares_totales igual)
 
-    # 2. Sumamos todos los métodos que entraron en Bolívares
+    # Aseguramos que si no hay turnos, el gran total sea 0 y no dé error
+    if totals.count_shifts == 0:
+        return jsonify(
+            {"msg": "No hay turnos cerrados en este periodo", "total_shifts": 0}
+        ), 200
+
+    dolares_directos = (totals.total_usd or 0) + (totals.total_zelle or 0)
     bolivares_totales = (
         (totals.total_bs or 0)
         + (totals.total_pagomovil or 0)
@@ -315,8 +330,6 @@ def get_audit_summary():
         + (totals.total_punto or 0)
     )
 
-    # 3. Calculamos el Gran Total convirtiendo los Bs a tasa BCV
-    # Evitamos división por cero por si acaso
     total_convertido = dolares_directos + (
         bolivares_totales / (tasa_bcv if tasa_bcv > 0 else 1)
     )
@@ -333,9 +346,7 @@ def get_audit_summary():
                 "punto": float(totals.total_punto or 0),
             },
             "total_shifts": totals.count_shifts,
-            "grand_total_usd": round(
-                total_convertido, 2
-            ),  # Aquí está la magia del recalculo
+            "grand_total_usd": round(total_convertido, 2),
             "tasa_utilizada": tasa_bcv,
         }
     ), 200

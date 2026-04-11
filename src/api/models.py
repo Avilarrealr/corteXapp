@@ -96,6 +96,10 @@ class CashShift(db.Model):
     opened_at = db.Column(db.DateTime, default=db.func.now())
     closed_at = db.Column(db.DateTime, nullable=True)
 
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organization.id"), nullable=False
+    )
+
     cashier_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     company_id = db.Column(db.Integer, db.ForeignKey("company.id"), nullable=False)
 
@@ -103,13 +107,19 @@ class CashShift(db.Model):
 class ExchangeRate(db.Model):
     __tablename__ = "exchange_rate"
     id = db.Column(db.Integer, primary_key=True)
-    rate = db.Column(db.Float, nullable=False)  # Ejemplo: 36.55
-    date = db.Column(
-        db.Date, default=datetime.utcnow().date, unique=True
-    )  # Una tasa por día
+    rate = db.Column(db.Float, nullable=False)
+
+    # IMPORTANTE: Eliminamos el 'unique=True' de date, porque ahora
+    # múltiples organizaciones pueden tener una tasa para la misma fecha.
+    date = db.Column(db.Date, default=datetime.utcnow().date)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Relación opcional con la empresa si decides que sea global o por sede
+    # Vínculo obligatorio con la Organización
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organization.id"), nullable=False
+    )
+
+    # Vínculo opcional con la sede (si quieres tasas distintas por ciudad/sede)
     company_id = db.Column(db.Integer, db.ForeignKey("company.id"), nullable=True)
 
     def serialize(self):
@@ -117,4 +127,5 @@ class ExchangeRate(db.Model):
             "id": self.id,
             "rate": self.rate,
             "date": self.date.strftime("%Y-%m-%d"),
+            "organization_id": self.organization_id,
         }
