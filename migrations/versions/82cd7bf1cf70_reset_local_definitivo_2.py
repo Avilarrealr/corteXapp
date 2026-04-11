@@ -1,8 +1,8 @@
-"""Reset local definitivo
+"""Reset local definitivo 2
 
-Revision ID: 504de573e4ea
+Revision ID: 82cd7bf1cf70
 Revises: 
-Create Date: 2026-04-06 00:50:09.286433
+Create Date: 2026-04-11 00:10:18.071074
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '504de573e4ea'
+revision = '82cd7bf1cf70'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -36,10 +36,11 @@ def upgrade():
     sa.Column('rate', sa.Float(), nullable=False),
     sa.Column('date', sa.Date(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('organization_id', sa.Integer(), nullable=False),
     sa.Column('company_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['company_id'], ['company.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('date')
+    sa.ForeignKeyConstraint(['organization_id'], ['organization.id'], ),
+    sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -67,10 +68,12 @@ def upgrade():
     sa.Column('status', sa.String(length=20), nullable=True),
     sa.Column('opened_at', sa.DateTime(), nullable=True),
     sa.Column('closed_at', sa.DateTime(), nullable=True),
+    sa.Column('organization_id', sa.Integer(), nullable=False),
     sa.Column('cashier_id', sa.Integer(), nullable=False),
     sa.Column('company_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['cashier_id'], ['user.id'], ),
     sa.ForeignKeyConstraint(['company_id'], ['company.id'], ),
+    sa.ForeignKeyConstraint(['organization_id'], ['organization.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###
