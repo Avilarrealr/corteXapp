@@ -105,11 +105,17 @@ def handle_login():
     body = request.get_json()
     user = User.query.filter_by(email=body["email"]).first()
 
-    # Validación simple de entrada
     if user is None or not user.check_password(body["password"]):
         return jsonify({"msg": "Credenciales inválidas"}), 401
 
-    access_token = create_access_token(identity=str(user.id))
+    # CAMBIO AQUÍ: Enviamos un diccionario con el ID del usuario y su organización
+    identity = {
+        "user_id": user.id,
+        "organization_id": user.organization_id,  # <--- Esto es lo que nos faltaba
+    }
+
+    access_token = create_access_token(identity=identity)
+
     return jsonify(
         {"msg": "Login exitoso", "token": access_token, "user": user.serialize()}
     ), 200
@@ -193,8 +199,10 @@ def delete_company(company_id):
 @api.route("/cash-shift/open", methods=["POST"])
 @jwt_required()
 def open_shift():
+    identity = get_jwt_identity()
     cashier_id = get_jwt_identity()
     body = request.get_json()
+    organization_id = identity.get("organization_id")
 
     # Verificamos si ya tiene un turno abierto
     active_shift = CashShift.query.filter_by(
@@ -205,11 +213,14 @@ def open_shift():
 
     # CAMBIO AQUÍ: Usar las llaves nuevas que envía el frontend
     new_shift = CashShift(
-        open_amount_usd=body.get("open_amount_usd", 0),  # Cambiado de open_amount
-        open_amount_bs=body.get("open_amount_bs", 0),  # Nueva llave
+        open_amount_usd=body.get("open_amount_usd", 0),
+        open_amount_bs=body.get("open_amount_bs", 0),
         cashier_id=cashier_id,
-        company_id=body["company_id"],
+        company_id=body.get(
+            "company_id"
+        ),  # Usar .get() es más seguro para evitar KeyErrors
         status="open",
+        organization_id=organization_id,  # Ahora sí tiene valor
         opened_at=datetime.utcnow(),
     )
 
@@ -496,3 +507,32 @@ def get_company_trends(company_id):
         trend_data.append({"fecha": fecha_formateada, "ventas": round(total_turno, 2)})
 
     return jsonify(trend_data), 200
+
+
+@api.route("/shifts/weekly-summary", methods=["GET"])
+@jwt_required()
+def get_weekly_summary():
+    # Obtenemos el ID de la organización del usuario actual
+    organization_id = get_jwt_identity().get("organization_id")
+
+    # Calculamos la fecha de hace 7 días
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+
+    # Consulta: Sumar ingresos agrupados por día
+    summary = (
+        db.session.query(
+            func.date(CashShift.open_time).label("date"),
+            func.sum(CashShift.total_income).label("total"),
+        )
+        .filter(
+            CashShift.organization_id == organization_id,
+            CashShift.open_time >= seven_days_ago,
+        )
+        .group_by(func.date(CashShift.open_time))
+        .order_by(func.date(CashShift.open_time).desc())
+        .all()
+    )
+
+    return jsonify(
+        [{"date": str(s.date), "total": float(s.total)} for s in summary]
+    ), 200

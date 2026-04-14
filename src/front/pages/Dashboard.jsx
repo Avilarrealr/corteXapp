@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import useGlobalReducer from "../hooks/useGlobalReducer";
 import { CustomModal } from "../components/CustomModal";
+import { DailyTotalsRow } from "../components/DailyTotalsRow";
 
 export const Dashboard = () => {
     // Estados para el Modal
@@ -362,6 +363,11 @@ export const Dashboard = () => {
                     </div>
 
                     {/* SELECTOR DE FECHA */}
+                    <div className="container">
+                        <h1>Dashboard CortexApp</h1>
+                        <DailyTotalsRow />  {/* <-- Aquí aparecerá la magia */}
+                        <CalendarComponent />
+                    </div>
                     <div className="flex flex-col items-start md:items-end gap-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Auditar Fecha:</label>
                         <div className="relative group">
