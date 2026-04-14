@@ -6,6 +6,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_tok
 from werkzeug.security import generate_password_hash
 from sqlalchemy import func, text
 from datetime import datetime, timedelta
+import json
 
 api = Blueprint("api", __name__)
 
@@ -109,12 +110,9 @@ def handle_login():
         return jsonify({"msg": "Credenciales inválidas"}), 401
 
     # CAMBIO AQUÍ: Enviamos un diccionario con el ID del usuario y su organización
-    identity = {
-        "user_id": user.id,
-        "organization_id": user.organization_id,  # <--- Esto es lo que nos faltaba
-    }
+    identity_data = {"user_id": user.id, "organization_id": user.organization_id}
 
-    access_token = create_access_token(identity=identity)
+    access_token = create_access_token(identity=identity_data)
 
     return jsonify(
         {"msg": "Login exitoso", "token": access_token, "user": user.serialize()}
@@ -199,9 +197,9 @@ def delete_company(company_id):
 @api.route("/cash-shift/open", methods=["POST"])
 @jwt_required()
 def open_shift():
-    identity = get_jwt_identity()
-    cashier_id = get_jwt_identity()
+    identity = json.loads(get_jwt_identity())
     body = request.get_json()
+    cashier_id = identity.get("user_id")
     organization_id = identity.get("organization_id")
 
     # Verificamos si ya tiene un turno abierto
