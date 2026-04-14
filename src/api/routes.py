@@ -110,8 +110,10 @@ def handle_login():
         return jsonify({"msg": "Credenciales inválidas"}), 401
 
     # CAMBIO AQUÍ: Enviamos un diccionario con el ID del usuario y su organización
-    identity_data = {"user_id": user.id, "organization_id": user.organization_id}
-
+    # routes.py -> handle_login
+    identity_data = json.dumps(
+        {"user_id": user.id, "organization_id": user.organization_id}
+    )
     access_token = create_access_token(identity=identity_data)
 
     return jsonify(
