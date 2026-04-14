@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import useGlobalReducer from "../hooks/useGlobalReducer";
 
-const DailyTotalsRow = () => {
+export const DailyTotalsRow = () => {
     const { store } = useGlobalReducer();
     const [dailyData, setDailyData] = useState([]);
 
