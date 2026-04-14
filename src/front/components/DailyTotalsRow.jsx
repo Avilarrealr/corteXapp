@@ -1,14 +1,14 @@
-import React, { useEffect, useState, useContext } from "react";
-import { Context } from "../store/appContext"; // Importa tu contexto
+import React, { useEffect, useState } from "react";
+import useGlobalReducer from "../hooks/useGlobalReducer";
 
 const DailyTotalsRow = () => {
-    const { store, actions } = useContext(Context);
+    const { store } = useGlobalReducer();
     const [dailyData, setDailyData] = useState([]);
 
     useEffect(() => {
         const loadSummary = async () => {
             // Asegúrate de usar la URL completa de tu backend (Render o Local)
-            const resp = await fetch(process.env.VITE_BACKEND_URL + "/api/shifts/weekly-summary", {
+            const resp = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/shifts/weekly-summary`, {
                 headers: {
                     "Authorization": "Bearer " + store.token // Tu JWT para el organization_id
                 }
